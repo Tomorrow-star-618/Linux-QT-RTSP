@@ -307,8 +307,10 @@ void Controller::FunButtonClickedHandler()
             if (!m_detectList) {
                 m_detectList = new DetectList();
                 m_detectList->setAttribute(Qt::WA_DeleteOnClose); // 关闭时自动释放
+                // 连接对象检测列表的 selectionChanged 信号到 Controller 的槽函数
                 connect(m_detectList, &DetectList::selectionChanged, 
                         this, &Controller::onDetectListSelectionChanged);
+                // 当 DetectList 窗口被销毁时，将 m_detectList 指针置为 nullptr
                 connect(m_detectList, &QObject::destroyed, 
                         [this]() { m_detectList = nullptr; });
             }

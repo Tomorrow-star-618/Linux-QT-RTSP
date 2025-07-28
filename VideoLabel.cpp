@@ -141,6 +141,7 @@ void VideoLabel::mouseMoveEvent(QMouseEvent* event)
 
 void VideoLabel::mouseReleaseEvent(QMouseEvent* event)
 {
+    // 如果是左键释放，且当前正在绘制并且绘制功能已启用
     if (event->button() == Qt::LeftButton && m_isDrawing && m_drawingEnabled) {
         m_isDrawing = false;
         
@@ -274,32 +275,32 @@ void VideoLabel::drawRectangle(QPainter& painter)
 
 void VideoLabel::drawButtons(QPainter& painter)
 {
-    // 绘制确定按钮
-    painter.setPen(QPen(Qt::white, 2));
-    painter.setBrush(QBrush(QColor(0, 150, 0, 200)));  // 绿色半透明
-    painter.drawRoundedRect(m_confirmButtonRect, 5, 5);
+    // 绘制“确定”按钮
+    painter.setPen(QPen(Qt::white, 2)); // 设置白色边框，线宽为2
+    painter.setBrush(QBrush(QColor(0, 150, 0, 200)));  // 设置填充为绿色半透明
+    painter.drawRoundedRect(m_confirmButtonRect, 5, 5); // 绘制圆角矩形作为按钮背景
     
-    // 绘制确定按钮文字
-    painter.setPen(Qt::white);
+    // 绘制“确定”按钮文字
+    painter.setPen(Qt::white); // 设置文字颜色为白色
     QFont font = painter.font();
-    font.setPointSize(10);
-    font.setBold(true);
+    font.setPointSize(10);     // 设置字体大小
+    font.setBold(true);        // 设置字体加粗
     painter.setFont(font);
     
-    QRect textRect = painter.fontMetrics().boundingRect("确定");
-    QPoint textPos = m_confirmButtonRect.center() - QPoint(textRect.width()/2, textRect.height()/2);
-    painter.drawText(textPos, "确定");
+    QRect textRect = painter.fontMetrics().boundingRect("确定"); // 获取“确定”文字的矩形区域
+    QPoint textPos = m_confirmButtonRect.center() - QPoint(textRect.width()/2, textRect.height()/2); // 计算文字居中位置
+    painter.drawText(textPos, "确定"); // 绘制“确定”文字
     
-    // 绘制取消按钮
-    painter.setPen(QPen(Qt::white, 2));
-    painter.setBrush(QBrush(QColor(200, 0, 0, 200)));  // 红色半透明
-    painter.drawRoundedRect(m_cancelButtonRect, 5, 5);
+    // 绘制“取消”按钮
+    painter.setPen(QPen(Qt::white, 2)); // 设置白色边框，线宽为2
+    painter.setBrush(QBrush(QColor(200, 0, 0, 200)));  // 设置填充为红色半透明
+    painter.drawRoundedRect(m_cancelButtonRect, 5, 5); // 绘制圆角矩形作为按钮背景
     
-    // 绘制取消按钮文字
-    painter.setPen(Qt::white);
-    textRect = painter.fontMetrics().boundingRect("取消");
-    textPos = m_cancelButtonRect.center() - QPoint(textRect.width()/2, textRect.height()/2);
-    painter.drawText(textPos, "取消");
+    // 绘制“取消”按钮文字
+    painter.setPen(Qt::white); // 设置文字颜色为白色
+    textRect = painter.fontMetrics().boundingRect("取消"); // 获取“取消”文字的矩形区域
+    textPos = m_cancelButtonRect.center() - QPoint(textRect.width()/2, textRect.height()/2); // 计算文字居中位置
+    painter.drawText(textPos, "取消"); // 绘制“取消”文字
 }
 
 void VideoLabel::updateButtonPositions()
@@ -325,6 +326,7 @@ void VideoLabel::updateButtonPositions()
     m_cancelButtonRect = QRect(startX + buttonWidth + buttonSpacing, buttonY, buttonWidth, buttonHeight);
 }
 
+// 判断给定点是否在指定按钮区域内
 bool VideoLabel::isPointInButton(const QPoint& pos, const QRect& buttonRect) const
 {
     return buttonRect.contains(pos);

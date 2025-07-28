@@ -44,9 +44,9 @@ public:
     explicit Tcpserver(QWidget* parent = nullptr);
     ~Tcpserver();
 
-    void Tcp_sent_info(int deviceId, int operationId, int operationValue);
-    void Tcp_sent_rect(int x, int y, int width, int height);
-    void Tcp_sent_list(const QSet<int>& objectIds);  
+    void Tcp_sent_info(int deviceId, int operationId, int operationValue);  // 发送设备操作信息
+    void Tcp_sent_rect(int x, int y, int width, int height);    // 发送矩形框信息  
+    void Tcp_sent_list(const QSet<int>& objectIds); // 发送目标ID列表
     void startListen();                // 开始监听
     void stopListen();                 // 停止监听
 
