@@ -15,6 +15,27 @@
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
 
+// 设备ID枚举定义
+enum DeviceID {
+    DEVICE_SERVO = 1,    // 舵机设备
+    DEVICE_CAMERA = 2,   // 摄像头设备
+    DEVICE_LED = 3       // LED设备
+};
+
+// 操作ID枚举定义
+enum OperationID {
+    // 舵机操作ID (1-5)
+    SERVO_UP = 1,      // 云台上
+    SERVO_DOWN = 2,    // 云台下
+    SERVO_LEFT = 3,    // 云台左
+    SERVO_RIGHT = 4,   // 云台右
+    SERVO_RESET = 5,   // 云台复位
+
+    // 摄像头操作ID
+    CAMERA_AI_ENABLE = 6,      // AI使能
+    CAMERA_REGION_ENABLE = 7   // 区域使能
+}; 
+
 class TcpServerThread;
 
 class Tcpserver : public QWidget {
@@ -23,38 +44,48 @@ public:
     explicit Tcpserver(QWidget* parent = nullptr);
     ~Tcpserver();
 
+    void Tcp_sent_info(int deviceId, int operationId, int operationValue);
+    void Tcp_sent_rect(int x, int y, int width, int height);
+    void Tcp_sent_list(const QSet<int>& objectIds);  
+    void startListen();                // 开始监听
+    void stopListen();                 // 停止监听
+
 private slots:
-    void startListen();
-    void stopListen();
-    void clearTextBrowser();
-    void sendMessages();
-    void clientConnected();
-    void receiveMessages();
-    void socketStateChange(QAbstractSocket::SocketState state);
+    void clearTextBrowser();           // 清空文本显示
+    void sendMessages();               // 发送消息给客户端
+    void clientConnected();            // 有客户端连接
+    void receiveMessages();            // 接收客户端消息
+    void lockip();                     // 锁定/解锁IP输入框
+    void socketStateChange(QAbstractSocket::SocketState state); // socket状态变化处理
 
 private:
-    void getLocalHostIP();
-    QTcpServer* tcpServer;
-    QList<QTcpSocket*> clientSockets;
-    QPushButton* pushButton[4];
-    QLabel* label[2];
-    QLineEdit* lineEdit;
-    QComboBox* comboBox;
-    QSpinBox* spinBox;
-    QTextBrowser* textBrowser;
-    QVBoxLayout* vBoxLayout;
-    QHBoxLayout* hBoxLayout[4];
-    QWidget* hWidget[3];
-    QWidget* vWidget;
-    QList<QHostAddress> IPlist;
-    TcpServerThread* serverThread;
+    void getLocalHostIP();             // 获取本地所有IP
+    QTcpServer* tcpServer;             // TCP服务器对象
+    QList<QTcpSocket*> clientSockets;  // 已连接的客户端socket列表
+    QPushButton* pushButton[5];        // 按钮数组
+    QLabel* label[2];                  // 标签数组
+    QLineEdit* Ip_lineEdit;            // IP输入框
+    QLineEdit* Sent_lineEdit;          // 发送消息输入框
+    QComboBox* comboBox;               // 客户端端口选择下拉框
+    QSpinBox* spinBox;                 // 监听端口号选择框
+    QTextBrowser* textBrowser;         // 文本显示区
+    QVBoxLayout* vBoxLayout;           // 垂直布局
+    QHBoxLayout* hBoxLayout[4];        // 水平布局数组
+    QWidget* hWidget[3];               // 水平布局用的widget
+    QWidget* vWidget;                  // 主widget
+    QList<QHostAddress> IPlist;        // 本地IP列表
+    TcpServerThread* serverThread;     // 服务器线程指针
+
 };
 
+// TcpServerThread 线程类，用于处理服务器后台任务
 class TcpServerThread : public QThread {
     Q_OBJECT
 public:
+    // 构造函数，接收Tcpserver指针和父对象指针
     TcpServerThread(Tcpserver* server, QObject* parent = nullptr);
+    // 重写run方法，实现线程任务
     void run() override;
 private:
-    Tcpserver* m_server;
+    Tcpserver* m_server; // 保存Tcpserver对象指针
 }; 

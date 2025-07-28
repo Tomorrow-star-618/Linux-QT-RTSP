@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -10,11 +10,25 @@ DEFINES += QT_DEPRECATED_WARNINGS
 DEFINES += __STDC_CONSTANT_MACROS __STDC_FORMAT_MACROS
 
 SOURCES += \
+    Picture.cpp \
+    Tcpserver.cpp \
+    VideoLabel.cpp \
+    detectlist.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    model.cpp \
+    view.cpp \
+    controller.cpp
 
 HEADERS += \
-    mainwindow.h
+    Picture.h \
+    Tcpserver.h \
+    VideoLabel.h \
+    detectlist.h \
+    mainwindow.h \
+    model.h \
+    view.h \
+    controller.h
 
 FORMS += \
     mainwindow.ui
@@ -38,9 +52,10 @@ LIBS += -L/usr/lib/x86_64-linux-gnu
 LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio
 
 
-
-
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+RESOURCES += \
+    icon.qrc

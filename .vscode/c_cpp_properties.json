@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",                        // 当前工作区路径
+                "/usr/include/x86_64-linux-gnu/qt5/QtWidgets",  // 原有 QtWidgets 路径
+                "/opt/Qt5.12.9/5.12.9/gcc_64/include",          // 正确的 Qt 头文件路径
+                "/opt/Qt5.12.9/5.12.9/gcc_64/include/QtCore",   // QtCore 头文件路径
+                "/opt/Qt5.12.9/5.12.9/gcc_64/include/QtGui",    // QtGui 头文件路径
+                "/opt/Qt5.12.9/5.12.9/gcc_64/include/QtWidgets" // QtWidgets 头文件路径
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",                   // 使用系统的 gcc 编译器
+            "cStandard": "c11",                               // C 标准
+            "cppStandard": "gnu++14",                         // C++ 标准
+            "intelliSenseMode": "linux-gcc-x64",              // 使用 GCC 编译模式
+            "browse": {
+                "path": [
+                    "/opt/Qt5.12.9/5.12.9/gcc_64/include",          // 正确的 Qt 头文件路径
+                    "/usr/include/x86_64-linux-gnu/qt5/QtWidgets",  // 保留原有的路径
+                    "/usr/include/c++/7",                          // C++ 标准库路径
+                    "/usr/include"                                  // 系统头文件路径
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

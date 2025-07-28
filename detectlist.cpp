@@ -18,9 +18,8 @@ const QStringList DetectList::s_objectNames = {
 DetectList::DetectList(QWidget* parent)
     : QWidget(parent)
 {
+    this->resize(800, 480);
     setWindowTitle("对象检测列表 - COCO数据集");
-    setMinimumSize(600, 500);
-    setMaximumSize(800, 700);
     
     initUI();
     createObjectCheckBoxes();
@@ -34,8 +33,8 @@ void DetectList::initUI()
 {
     // 主布局
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(10);
-    mainLayout->setContentsMargins(15, 15, 15, 15);
+    mainLayout->setSpacing(8);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
 
     // 标题
     QLabel* titleLabel = new QLabel("选择要检测的对象：");
@@ -45,7 +44,7 @@ void DetectList::initUI()
             font-size: 16px;
             font-weight: bold;
             color: #333333;
-            padding: 5px;
+            padding: 3px;
         }
     )");
     mainLayout->addWidget(titleLabel);
@@ -57,7 +56,7 @@ void DetectList::initUI()
             font-family: "Microsoft YaHei";
             font-size: 12px;
             color: #666666;
-            padding: 3px;
+            padding: 2px;
         }
     )");
     mainLayout->addWidget(m_countLabel);
@@ -204,8 +203,8 @@ void DetectList::createObjectCheckBoxes()
 {
     m_checkBoxes.clear();
     
-    // 创建80个复选框，每行8个
-    int cols = 8;
+    // 创建80个复选框，每行5个
+    int cols = 5;
     for (int i = 0; i < s_objectNames.size(); ++i) {
         QCheckBox* checkBox = new QCheckBox(s_objectNames[i]);
         checkBox->setProperty("objectId", i);
@@ -214,14 +213,15 @@ void DetectList::createObjectCheckBoxes()
         checkBox->setStyleSheet(R"(
             QCheckBox {
                 font-family: "Microsoft YaHei";
-                font-size: 12px;
+                font-size: 13px;
                 color: #333333;
                 spacing: 8px;
                 padding: 4px;
+                min-width: 110px;
             }
             QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
+                width: 18px;
+                height: 18px;
                 border: 2px solid #cccccc;
                 border-radius: 3px;
                 background-color: white;

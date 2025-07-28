@@ -329,3 +329,4 @@ bool VideoLabel::isPointInButton(const QPoint& pos, const QRect& buttonRect) con
 {
     return buttonRect.contains(pos);
 } 
+

@@ -1,2 +1,14 @@
-<!DOCTYPE RCC>
-<RCC version="1.0"/>
+<RCC>
+    <qresource prefix="/">
+        <file>icon/down.png</file>
+        <file>icon/left.png</file>
+        <file>icon/right.png</file>
+        <file>icon/up.png</file>
+        <file>icon/reset.png</file>
+        <file>icon/addvideo.png</file>
+        <file>icon/album.png</file>
+        <file>icon/closevideo.png</file>
+        <file>icon/screenshot.png</file>
+        <file>icon/tcp.png</file>
+    </qresource>
+</RCC>

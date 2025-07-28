@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "qapplication": "cpp",
+        "qhboxlayout": "cpp",
+        "*.tcc": "cpp",
+        "string": "cpp"
+    }
+}
