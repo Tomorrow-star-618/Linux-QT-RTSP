@@ -52,6 +52,7 @@ public:
     void Tcp_sent_list(const QSet<int>& objectIds); // 发送目标ID列表
     void startListen();                // 开始监听
     void stopListen();                 // 停止监听
+    bool hasConnectedClients() const;  // 判断是否有已连接客户端
 
 private slots:
     void clearTextBrowser();           // 清空文本显示
@@ -91,4 +92,4 @@ public:
     void run() override;
 private:
     Tcpserver* m_server; // 保存Tcpserver对象指针
-}; 
+};

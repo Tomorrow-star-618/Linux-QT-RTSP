@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QRect>
+#include <QTextBrowser>
 #include "VideoLabel.h"
 #include "common.h"
 
@@ -30,6 +31,9 @@ public:
     // 启用/禁用绘制功能
     void enableDrawing(bool enabled);
     bool isDrawingEnabled() const;
+    
+    // 事件消息相关方法
+    void addEventMessage(const QString& type, const QString& message);
 
 signals:
     void rectangleConfirmed(const RectangleBox& rect); // 矩形框确认信号
@@ -42,6 +46,7 @@ private slots:
 
 private:
     void initleft();       // 初始化左边面板
+    void initmiddle();     // 初始化中间面板
     void initright();      // 初始化右边面板
     void initButtons();    // 初始化按键列表
     void initservo();      // 初始化云台按键列表 
@@ -54,12 +59,15 @@ private:
     QList<QPushButton*> funButtons;  // 存储摄像头功能按钮的列表
 
     VideoLabel* videoLabel;    //图像面板（使用自定义VideoLabel）
-    QLabel* stepLabel;     //步进标签
-    QSlider* stepSlider;   //步进滑块
-    QComboBox* stepCombox; //步进下拉框
+    QLabel* stepLabel;         //步进标签
+    QSlider* stepSlider;       //步进滑块
+    QComboBox* stepCombox;     //步进下拉框
+    QLabel* eventLabel;        //事件消息框标签
+    QTextBrowser* eventBrowser; //事件消息显示框
 
     QWidget* leftPanel;    //左边整体面板
-    QWidget* funPanel;     //左上方功能面板
+    QWidget* funPanel;     //中上方功能面板
+    QWidget* middlePanel;  //中间整体面板
     QWidget* rightPanel;   //右边整体面板
     QWidget* buttonPanel;  //按键整体面板
     QWidget* servoPanel;   //云台整体面板

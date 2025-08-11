@@ -378,3 +378,13 @@ void Tcpserver::Tcp_sent_list(const QSet<int>& objectIds)
 //                       .arg(objectIds.size())
 //                       .arg(idList.join(", ")));
 } 
+
+bool Tcpserver::hasConnectedClients() const
+{
+    for (QTcpSocket* sock : clientSockets) {
+        if (sock && sock->state() == QAbstractSocket::ConnectedState) {
+            return true;
+        }
+    }
+    return false;
+}

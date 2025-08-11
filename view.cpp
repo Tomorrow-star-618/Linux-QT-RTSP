@@ -15,6 +15,9 @@
 #include <QPoint>
 #include <QDebug>
 #include <QToolTip>
+#include <QTextBrowser>
+#include <QDateTime>
+#include <QScrollBar>
 
 View::View(QWidget* parent)
     : QWidget(parent), m_hasRectangle(false)
@@ -25,11 +28,15 @@ View::View(QWidget* parent)
     // 初始化左边布局
     initleft();
 
+    // 初始化中间布局
+    initmiddle();
+
     // 初始化右边布局
     initright();
 
     // 添加左面板与右面板到主界面水平布局
-    mainLayout->addWidget(leftPanel, 7);
+    mainLayout->addWidget(leftPanel, 1);
+    mainLayout->addWidget(middlePanel, 4);
     mainLayout->addWidget(rightPanel, 1);
 }
 
@@ -62,7 +69,56 @@ void View::initleft()
 {
     // 创建左侧面板并应用垂直布局
     leftPanel = new QWidget();
+    leftPanel->setMinimumWidth(250); // 设置左侧面板最小宽度
+    leftPanel->setMaximumWidth(250); // 设置左侧面板最大宽度，避免过宽
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
+    leftLayout->setContentsMargins(5, 20, 5, 5); // 设置边距：左、上、右、下
+    
+    // 创建事件消息框标签
+    eventLabel = new QLabel("事件消息", leftPanel);
+    eventLabel->setStyleSheet(
+        "QLabel {"
+        "  font-family: 'Microsoft YaHei';"
+        "  font-size: 18px;"
+        "  font-weight: bold;"
+        "  color: #ffffff;"
+        "  background-color: #ff8800;"
+        "  border: 1px solid #e67300;"
+        "  border-radius: 5px;"
+        "  padding: 8px;"
+        "  margin: 2px;"
+        "}"
+    );
+    eventLabel->setAlignment(Qt::AlignCenter);
+    
+    // 创建事件消息文本浏览器
+    eventBrowser = new QTextBrowser(leftPanel);
+    eventBrowser->setStyleSheet(
+        "QTextBrowser {"
+        "  font-family: 'Consolas', 'Monaco', monospace;"
+        "  font-size: 12px;"
+        "  background-color: #ffffff;"
+        "  border: 1px solid #cccccc;"
+        "  border-radius: 5px;"
+        "  padding: 5px;"
+        "  selection-background-color: #3399ff;"
+        "}"
+    );
+    eventBrowser->setMinimumHeight(200);
+    eventBrowser->setMinimumWidth(160); // 设置文本浏览器最小宽度
+    
+    
+    // 将控件添加到左侧布局
+    leftLayout->addWidget(eventLabel);
+    leftLayout->addWidget(eventBrowser);
+    //leftLayout->addStretch(); // 添加弹性空间
+}
+
+void View::initmiddle()
+{
+    // 创建中间面板并应用垂直布局
+    middlePanel = new QWidget();
+    QVBoxLayout *middleLayout = new QVBoxLayout(middlePanel);
 
     // 初始化功能按钮面板
     initFunButtons();
@@ -70,15 +126,17 @@ void View::initleft()
     // 初始化视频显示标签
     initVideoLabel();
 
-    // 将功能按钮面板和视频标签添加到左侧布局
-    leftLayout->addWidget(funPanel,1);
-    leftLayout->addWidget(videoLabel,8);
+    // 将功能按钮面板和视频标签添加到中间布局
+    middleLayout->addWidget(funPanel, 1);
+    middleLayout->addWidget(videoLabel, 8);
 }
 
 void View::initright()
 {
     // 创建右侧面板并应用垂直布局
     rightPanel = new QWidget();
+    rightPanel->setMinimumWidth(250); // 设置右侧面板最小宽度，与左侧保持一致
+    rightPanel->setMaximumWidth(250); // 设置右侧面板最大宽度，避免过宽
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
 
     // 初始化右侧按钮面板
@@ -424,6 +482,48 @@ bool View::isDrawingEnabled() const
         return videoLabel->isDrawingEnabled();
     }
     return false;
+}
+
+// 添加事件消息到文本浏览器
+void View::addEventMessage(const QString& type, const QString& message)
+{
+    if (!eventBrowser) return;
+    
+    QString color;
+    QString prefix;
+    
+    // 根据消息类型设置颜色和前缀
+    if (type == "error") {
+        color = "#cc0000";
+        prefix = "[错误]";
+    } else if (type == "warning") {
+        color = "#ff8800";
+        prefix = "[警告]";
+    } else if (type == "success") {
+        color = "#008000";
+        prefix = "[成功]";
+    } else if (type == "info") {
+        color = "#0066cc";
+        prefix = "[信息]";
+    } else {
+        color = "#333333";
+        prefix = "[消息]";
+    }
+    
+    QString timeStamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+    QString formattedMessage = QString("<span style='color: #666; font-size: 13px;'>[%1]</span> "
+                                      "<span style='color: %2; font-weight: bold;'>%3</span> "
+                                      "<span style='color: %4;'>%5</span>")
+                               .arg(timeStamp)
+                               .arg(color)
+                               .arg(prefix)
+                               .arg(color)
+                               .arg(message);
+    
+    eventBrowser->append(formattedMessage);
+    
+    // 自动滚动到底部显示最新消息
+    eventBrowser->verticalScrollBar()->setValue(eventBrowser->verticalScrollBar()->maximum());
 }
 
 

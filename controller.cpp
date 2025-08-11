@@ -71,6 +71,7 @@ void Controller::onAddCameraClicked()
     {
         // 未输入地址时弹出警告
         QMessageBox::warning(m_view, "错误", "未输入RTSP地址");
+        m_view->addEventMessage("warning", "未输入RTSP地址");
         return;
     }
 
@@ -82,7 +83,7 @@ void Controller::onFrameReady(const QImage& img)
 {
     if (!img.isNull())
     {
-        m_lastImage = img; // 保存最近一帧
+        m_lastImage = img; // 保存最近一帧图像
         m_view->getVideoLabel()->setPixmap(QPixmap::fromImage(img).scaled(m_view->getVideoLabel()->size(), Qt::KeepAspectRatio));
     }
 }
@@ -91,6 +92,7 @@ void Controller::saveImage()
 {
     if (m_lastImage.isNull()) {
         QMessageBox::warning(m_view, "提示", "当前没有可保存的图像！");
+        m_view->addEventMessage("warning", "当前没有可保存的图像！");
         return;
     }
     // 确保picture文件夹存在（使用源码路径）
@@ -101,8 +103,10 @@ void Controller::saveImage()
     QString fileName = dir.filePath(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz") + ".jpg");
     if (m_lastImage.save(fileName)) {
         QMessageBox::information(m_view, "截图成功", "图片已保存到: " + fileName);
+        m_view->addEventMessage("success", "截图成功，图片已保存到: " + fileName);
     } else {
-        QMessageBox::warning(m_view, "保存失败", "图片保存失败！");
+        QMessageBox::critical(m_view, "保存失败", "图片保存失败！");
+        m_view->addEventMessage("error", "图片保存失败！");
     }
 }
 
@@ -119,7 +123,11 @@ void Controller::ButtonClickedHandler()
     case 0:
         qDebug() << "添加摄像头";
         Controller::onAddCameraClicked();
-        tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
+        } else {
+            m_view->addEventMessage("warning", "请先连接TCP服务");
+        }
         break;
 
     case 1:
@@ -127,12 +135,20 @@ void Controller::ButtonClickedHandler()
         if (!m_paused) {
             m_model->pauseStream();
             m_paused = true;
-            tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 0);
+            if (tcpWin && tcpWin->hasConnectedClients()) {
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 0);
+            } else {
+                m_view->addEventMessage("warning", "请先连接TCP服务");
+            }
             qDebug() << "已暂停";
         } else {
             m_model->resumeStream();
             m_paused = false;
-            tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
+            if (tcpWin && tcpWin->hasConnectedClients()) {
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
+            } else {
+                m_view->addEventMessage("warning", "请先连接TCP服务");
+            }
             qDebug() << "已恢复";
         }
         break;
@@ -172,10 +188,12 @@ void Controller::ButtonClickedHandler()
                     "• 鼠标在视频区域会变为十字光标\n"
                     "• 矩形框坐标将自动保存\n\n"
                     "再次点击绘框按钮可关闭绘制功能");
+                m_view->addEventMessage("info", "绘框功能已启动！");
             } else {
                 // 禁用绘制功能
                 m_view->clearRectangle();
                 QMessageBox::information(m_view, "绘框功能", "绘框功能已关闭！");
+                m_view->addEventMessage("info", "绘框功能已关闭！");
             }
 
             // 获取当前矩形框信息（如果有的话）
@@ -202,6 +220,7 @@ void Controller::ButtonClickedHandler()
                 QMessageBox::warning(m_view, "TCP服务器状态",
                     "TCP服务器未启动！\n"
                     "请检查系统配置。");
+                m_view->addEventMessage("warning", "TCP服务器未启动！请检查系统配置");
             }
         }
         break;
@@ -218,30 +237,40 @@ void Controller::ServoButtonClickedHandler()
     // 获取当前步进值
     int stepValue = m_view->getStepValue();
 
+    // 判断是否有TCP连接
+    if (!(tcpWin && tcpWin->hasConnectedClients())) {
+        m_view->addEventMessage("warning", "请先连接TCP服务");
+        return;
+    }
+
     switch (id)
     {
     case 0:
         qDebug() << "云台 上，步进值:" << stepValue;
         tcpWin->Tcp_sent_info(DEVICE_SERVO, SERVO_UP, stepValue);
+        m_view->addEventMessage("info", QString("云台上转，步进值: %1").arg(stepValue));
         break;
     case 1:
         qDebug() << "云台 下，步进值:" << stepValue;
         tcpWin->Tcp_sent_info(DEVICE_SERVO, SERVO_DOWN, stepValue);
+        m_view->addEventMessage("info", QString("云台下转，步进值: %1").arg(stepValue));
         break;
     case 2:
         qDebug() << "云台 左，步进值:" << stepValue;
         tcpWin->Tcp_sent_info(DEVICE_SERVO, SERVO_LEFT, stepValue);
+        m_view->addEventMessage("info", QString("云台左转，步进值: %1").arg(stepValue));
         break;
     case 3:
         qDebug() << "云台 右，步进值:" << stepValue;
         tcpWin->Tcp_sent_info(DEVICE_SERVO, SERVO_RIGHT, stepValue);
+        m_view->addEventMessage("info", QString("云台右转，步进值: %1").arg(stepValue));
         break;
     case 4:
         qDebug() << "云台 复位，步进值:" << stepValue;
         tcpWin->Tcp_sent_info(DEVICE_SERVO, SERVO_RESET, stepValue);
+        m_view->addEventMessage("info", QString("云台复位"));
         break;
     }
-
 }
 
 void Controller::FunButtonClickedHandler()
@@ -253,28 +282,35 @@ void Controller::FunButtonClickedHandler()
     int id = clickedButton->property("ButtonID").toInt();
     bool isChecked = clickedButton->isChecked();
 
-    // 更新按钮依赖关系
-    updateButtonDependencies(id, isChecked);
-
     switch (id)
     {
     case 0: // AI功能
         qDebug() << "AI功能按钮被点击";
+        if (!(tcpWin && tcpWin->hasConnectedClients())) {
+            m_view->addEventMessage("warning", "请先连接TCP服务");
+            clickedButton->setChecked(!isChecked); // 回滚状态
+            return;
+        }
         if (isChecked) {
             qDebug() << "AI功能已开启";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
-            // 这里可以添加AI功能开启的逻辑
             QMessageBox::information(m_view, "AI功能", "AI功能已开启！");
+            m_view->addEventMessage("info", "AI功能已开启！");
         } else {
             qDebug() << "AI功能已关闭";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 0);
-            // 这里可以添加AI功能关闭的逻辑
             QMessageBox::information(m_view, "AI功能", "AI功能已关闭！");
+            m_view->addEventMessage("info", "AI功能已关闭！");
         }
         break;
 
     case 1: // 区域识别
         qDebug() << "区域识别按钮被点击";
+        if (!(tcpWin && tcpWin->hasConnectedClients())) {
+            m_view->addEventMessage("warning", "请先连接TCP服务");
+            clickedButton->setChecked(!isChecked);
+            return;
+        }
         if (isChecked) {
             qDebug() << "区域识别已开启";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 1);
@@ -282,44 +318,48 @@ void Controller::FunButtonClickedHandler()
             RectangleBox currentRect = m_view->getCurrentRectangle();
             if (currentRect.width > 0 && currentRect.height > 0) {
                 // 有矩形框，通过TCP发送矩形框信息
-                if (tcpWin) {
-                    tcpWin->Tcp_sent_rect(currentRect.x, currentRect.y,
+                tcpWin->Tcp_sent_rect(currentRect.x, currentRect.y,
                                         currentRect.width, currentRect.height);
-                    QMessageBox::information(m_view, "区域识别",
-                        QString("区域识别功能已开启！\n已发送矩形框信息：\n"
-                               "坐标: (%1, %2)\n尺寸: %3×%4")
-                        .arg(currentRect.x)
-                        .arg(currentRect.y)
-                        .arg(currentRect.width)
-                        .arg(currentRect.height));
-                } else {
-                    QMessageBox::warning(m_view, "区域识别",
-                        "区域识别功能已开启！\n但TCP服务器未启动，无法发送矩形框信息。");
-                }
+                QMessageBox::information(m_view, "区域识别",
+                    QString("区域识别功能已开启！\n已发送矩形框信息：\n"
+                           "坐标: (%1, %2)\n尺寸: %3×%4")
+                    .arg(currentRect.x)
+                    .arg(currentRect.y)
+                    .arg(currentRect.width)
+                    .arg(currentRect.height));
+                m_view->addEventMessage("info", QString("区域识别功能已开启！已发送矩形框信息：坐标(%1,%2) 尺寸%3×%4")
+                    .arg(currentRect.x).arg(currentRect.y).arg(currentRect.width).arg(currentRect.height));
             } else {
                 // 没有矩形框，提示用户先绘制
                 QMessageBox::information(m_view, "区域识别",
                     "区域识别功能已开启！\n请先绘制识别区域。");
+                m_view->addEventMessage("info", "区域识别功能已开启！请先绘制识别区域");
             }
         } else {
             qDebug() << "区域识别已关闭";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 0);
             QMessageBox::information(m_view, "区域识别", "区域识别功能已关闭！");
+            m_view->addEventMessage("info", "区域识别功能已关闭！");
         }
         break;
 
     case 2: // 对象识别
         qDebug() << "对象识别按钮被点击";
+        if (!(tcpWin && tcpWin->hasConnectedClients())) {
+            m_view->addEventMessage("warning", "请先连接TCP服务");
+            clickedButton->setChecked(!isChecked);
+            return;
+        }
         if (isChecked) {
             qDebug() << "对象识别已开启";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 1);
-            // 这里可以添加对象识别开启的逻辑
             QMessageBox::information(m_view, "对象识别", "对象识别功能已开启！");
+            m_view->addEventMessage("info", "对象识别功能已开启！");
         } else {
             qDebug() << "对象识别已关闭";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 0);
-            // 这里可以添加对象识别关闭的逻辑
             QMessageBox::information(m_view, "对象识别", "对象识别功能已关闭！");
+            m_view->addEventMessage("info", "对象识别功能已关闭！");
         }
         break;
 
@@ -352,6 +392,9 @@ void Controller::FunButtonClickedHandler()
         qDebug() << "未知功能按钮ID:" << id;
         break;
     }
+
+    // 更新按钮依赖关系
+    updateButtonDependencies(id, isChecked);
 }
 
 void Controller::onDetectListSelectionChanged(const QSet<int>& selectedIds)
@@ -374,17 +417,21 @@ void Controller::onDetectListSelectionChanged(const QSet<int>& selectedIds)
     qDebug() << "选中的对象名称:" << selectedNames;
 
     // 通过TCP发送对象列表信息
-    if (tcpWin) {
+    if (tcpWin && tcpWin->hasConnectedClients()) {
         tcpWin->Tcp_sent_list(selectedIds);
         QMessageBox::information(m_view, "对象检测设置",
             QString("已选择 %1 个对象进行检测：\n\n%2\n\n对象列表已通过TCP发送！")
             .arg(selectedIds.size())
             .arg(selectedNames.isEmpty() ? "未选择任何对象" : selectedNames.join(", ")));
+        m_view->addEventMessage("info", QString("已选择 %1 个对象进行检测，对象列表已通过TCP发送！")
+            .arg(selectedIds.size()));
     } else {
         QMessageBox::warning(m_view, "对象检测设置",
-            QString("已选择 %1 个对象进行检测：\n\n%2\n\n但TCP服务器未启动，无法发送对象列表。")
+            QString("已选择 %1 个对象进行检测：\n\n%2\n\n暂无TCP连接，无法发送对象列表。")
             .arg(selectedIds.size())
             .arg(selectedNames.isEmpty() ? "未选择任何对象" : selectedNames.join(", ")));
+        m_view->addEventMessage("warning", QString("已选择 %1 个对象进行检测，但无TCP连接")
+            .arg(selectedIds.size()));
     }
 }
 
@@ -396,7 +443,7 @@ void Controller::onRectangleConfirmed(const RectangleBox& rect)
     QList<QPushButton*> funButtons = m_view->getFunButtons();
     if (funButtons.size() > 1 && funButtons[1]->isChecked()) {
         // 区域识别已开启，发送矩形框信息
-        if (tcpWin) {
+        if (tcpWin && tcpWin->hasConnectedClients()) {
             tcpWin->Tcp_sent_rect(rect.x, rect.y, rect.width, rect.height);
             QMessageBox::information(m_view, "区域识别",
                 QString("矩形框已确认并发送！\n"
@@ -405,9 +452,12 @@ void Controller::onRectangleConfirmed(const RectangleBox& rect)
                 .arg(rect.y)
                 .arg(rect.width)
                 .arg(rect.height));
+            m_view->addEventMessage("info", QString("矩形框已确认并发送！坐标(%1,%2) 尺寸%3×%4")
+                .arg(rect.x).arg(rect.y).arg(rect.width).arg(rect.height));
         } else {
             QMessageBox::warning(m_view, "区域识别",
-                "矩形框已确认！\n但TCP服务器未启动，无法发送矩形框信息。");
+                "矩形框已确认！\n暂无TCP连接，无法发送矩形框信息。");
+            m_view->addEventMessage("warning", "矩形框已确认但无TCP连接，未发送");
         }
     }
 }
@@ -421,7 +471,7 @@ void Controller::onNormalizedRectangleConfirmed(const NormalizedRectangleBox& no
     QList<QPushButton*> funButtons = m_view->getFunButtons();
     if (funButtons.size() > 1 && funButtons[1]->isChecked()) {
         // 区域识别已开启，发送归一化矩形框信息
-        if (tcpWin) {
+        if (tcpWin && tcpWin->hasConnectedClients()) {
             tcpWin->Tcp_sent_rect(normRect.x, normRect.y, normRect.width, normRect.height);
             QMessageBox::information(m_view, "区域识别",
                 QString("归一化矩形框已确认并发送！\n"
@@ -430,9 +480,12 @@ void Controller::onNormalizedRectangleConfirmed(const NormalizedRectangleBox& no
                     .arg(normRect.y, 0, 'f', 4)
                     .arg(normRect.width, 0, 'f', 4)
                     .arg(normRect.height, 0, 'f', 4));
+            m_view->addEventMessage("info", QString("归一化矩形框已确认并发送！归一化坐标(%.4f,%.4f) 尺寸%.4f×%.4f")
+                .arg(normRect.x, 0, 'f', 4).arg(normRect.y, 0, 'f', 4).arg(normRect.width, 0, 'f', 4).arg(normRect.height, 0, 'f', 4));
         } else {
             QMessageBox::warning(m_view, "区域识别",
-                "归一化矩形框已确认！\n但TCP服务器未启动，无法发送矩形框信息。");
+                "归一化矩形框已确认！\n暂无TCP连接，无法发送矩形框信息。");
+            m_view->addEventMessage("warning", "归一化矩形框已确认但无TCP连接，未发送");
         }
     }
 }
@@ -452,9 +505,14 @@ void Controller::updateButtonDependencies(int clickedButtonId, bool isChecked)
                 areaRecognitionBtn->setChecked(false);
                 objectRecognitionBtn->setChecked(false);
                 qDebug() << "AI功能已关闭，同时关闭区域识别与对象识别";
-                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 0);
-                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 0);
+                if (tcpWin && tcpWin->hasConnectedClients()) {
+                    tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 0);
+                    tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 0);
+                } else {
+                    m_view->addEventMessage("warning", "请先连接TCP服务");
+                }
                 QMessageBox::information(m_view, "区域识别", "AI功能已关闭，区域识别与对象识别功能也已关闭！");
+                m_view->addEventMessage("info", "AI功能已关闭，区域识别与对象识别功能也已关闭！");
             }
         }
         break;
@@ -466,8 +524,13 @@ void Controller::updateButtonDependencies(int clickedButtonId, bool isChecked)
             if (!aiBtn->isChecked()) {
                 aiBtn->setChecked(true);
                 qDebug() << "区域识别需要AI功能，自动开启AI功能";
-                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
+                if (tcpWin && tcpWin->hasConnectedClients()) {
+                    tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
+                } else {
+                    m_view->addEventMessage("warning", "请先连接TCP服务");
+                }
                 QMessageBox::information(m_view, "AI功能", "区域识别功能需要AI功能支持，已自动开启AI功能！");
+                m_view->addEventMessage("info", "区域识别功能需要AI功能支持，已自动开启AI功能！");
             }
         }
         break;
@@ -479,10 +542,16 @@ void Controller::updateButtonDependencies(int clickedButtonId, bool isChecked)
             if (!aiBtn->isChecked()) {
                 aiBtn->setChecked(true);
                 qDebug() << "对象识别需要AI功能，自动开启AI功能";
-                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
+                if (tcpWin && tcpWin->hasConnectedClients()) {
+                    tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
+                } else {
+                    m_view->addEventMessage("warning", "请先连接TCP服务");
+                }
                 QMessageBox::information(m_view, "AI功能", "对象识别功能需要AI功能支持，已自动开启AI功能！");
+                m_view->addEventMessage("info", "对象识别功能需要AI功能支持，已自动开启AI功能！");
             }
         }
         break;
     }
 }
+

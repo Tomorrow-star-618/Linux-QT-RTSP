@@ -6,7 +6,8 @@
 	],
 	"settings": {
 		"files.associations": {
-			"qpushbutton": "cpp"
+			"qpushbutton": "cpp",
+			"string": "cpp"
 		}
 	}
 }
