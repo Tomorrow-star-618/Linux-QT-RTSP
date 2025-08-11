@@ -10,5 +10,11 @@
         <file>icon/closevideo.png</file>
         <file>icon/screenshot.png</file>
         <file>icon/tcp.png</file>
+        <file>icon/AI.png</file>
+        <file>icon/draw.png</file>
+        <file>icon/list.png</file>
+        <file>icon/rect.png</file>
+        <file>icon/object.png</file>
+        <file>icon/lmx.png</file>
     </qresource>
 </RCC>

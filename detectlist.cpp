@@ -20,7 +20,7 @@ const QStringList DetectList::s_objectNames = {
 DetectList::DetectList(QWidget* parent)
     : QWidget(parent)
 {
-    this->resize(800, 480); // 设置窗口大小
+    this->resize(800, 820); // 设置窗口大小
     setWindowTitle("对象检测列表 - COCO数据集");
     
     initUI();               // 初始化界面控件
@@ -53,6 +53,23 @@ void DetectList::initUI()
         }
     )");
     mainLayout->addWidget(titleLabel);
+
+    // 搜索输入框
+    m_searchEdit = new QLineEdit();
+    m_searchEdit->setPlaceholderText("搜索对象名称...");
+    m_searchEdit->setClearButtonEnabled(true);
+    m_searchEdit->setStyleSheet(R"(
+        QLineEdit {
+            font-family: "Microsoft YaHei";
+            font-size: 13px;
+            padding: 4px 8px;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+    )");
+    mainLayout->addWidget(m_searchEdit);
+    connect(m_searchEdit, &QLineEdit::textChanged, this, &DetectList::onSearchTextChanged);
 
     // 统计标签，显示已选择数量
     m_countLabel = new QLabel("已选择: 0/80 个对象");
@@ -216,7 +233,8 @@ void DetectList::createObjectCheckBoxes()
     // 创建80个复选框，每行5个
     int cols = 5;
     for (int i = 0; i < s_objectNames.size(); ++i) {
-        QCheckBox* checkBox = new QCheckBox(s_objectNames[i]); // 创建复选框
+        QString label = QString("%1. %2").arg(i+1).arg(s_objectNames[i]);
+        QCheckBox* checkBox = new QCheckBox(label); // 创建复选框
         checkBox->setProperty("objectId", i);                  // 设置对象ID属性
         
         // 设置复选框样式
@@ -346,4 +364,51 @@ void DetectList::setSelectedObjects(const QSet<int>& selectedIds)
 QStringList DetectList::getObjectNames()
 {
     return s_objectNames;
+} 
+
+void DetectList::onSearchTextChanged(const QString& text)
+{
+    updateSearchHighlight(text);
+}
+
+void DetectList::updateSearchHighlight(const QString& text)
+{
+    QString search = text.trimmed();
+    for (int i = 0; i < m_checkBoxes.size(); ++i) {
+        QCheckBox* cb = m_checkBoxes[i];
+        QString name = cb->text();
+        // 提取英文名部分（去掉前面的序号和点）
+        int dotIdx = name.indexOf('.');
+        QString objName = (dotIdx != -1) ? name.mid(dotIdx + 2) : name;
+        if (!search.isEmpty() && objName.startsWith(search, Qt::CaseInsensitive)) {
+            cb->setStyleSheet(cb->styleSheet() + "background-color:rgb(81, 211, 81);"); // 浅绿色
+        } else {
+            // 恢复原样式
+            cb->setStyleSheet(R"(
+                QCheckBox {
+                    font-family: \"Microsoft YaHei\";
+                    font-size: 13px;
+                    color: #333333;
+                    spacing: 8px;
+                    padding: 4px;
+                    min-width: 110px;
+                }
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #cccccc;
+                    border-radius: 3px;
+                    background-color: white;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #4CAF50;
+                    border-color: #4CAF50;
+                    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwIDNMNC41IDguNUwyIDYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=);
+                }
+                QCheckBox::indicator:unchecked:hover {
+                    border-color: #4CAF50;
+                }
+            )");
+        }
+    }
 } 

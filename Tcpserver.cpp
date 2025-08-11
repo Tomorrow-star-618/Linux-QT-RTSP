@@ -303,35 +303,56 @@ void Tcpserver::Tcp_sent_info(int deviceId, int operationId, int operationValue)
     
     // 在文本浏览器中显示发送的信息，并手动添加换行
     textBrowser->append("服务端发送设备信息：" + message);
-    textBrowser->append(QString("设备ID: %1, 操作ID: %2, 操作数值: %3\n")
-                       .arg(deviceId)
-                       .arg(operationId)
-                       .arg(operationValue));
+//    textBrowser->append(QString("设备ID: %1, 操作ID: %2, 操作数值: %3\n")
+//                       .arg(deviceId)
+//                       .arg(operationId)
+//                       .arg(operationValue));
 }
 
 void Tcpserver::Tcp_sent_rect(int x, int y, int width, int height)
 {
-    // 构造矩形框信息的字符串：RECT:x:y:width:height，并添加换行符
-    QString message = QString("RECT:%1:%2:%3:%4\r\n")
-                     .arg(x)
-                     .arg(y)
-                     .arg(width)
-                     .arg(height);
-    
+    // 构造绝对坐标矩形框信息的字符串
+    QString message = QString("RECT_ABS:%1:%2:%3:%4\r\n")
+                         .arg(x)
+                         .arg(y)
+                         .arg(width)
+                         .arg(height);
     // 发送给所有连接的客户端
     for (QTcpSocket* sock : clientSockets) {
         if (sock->state() == QAbstractSocket::ConnectedState) {
             sock->write(message.toUtf8());
         }
     }
-    
     // 在文本浏览器中显示发送的矩形框信息
-    textBrowser->append("服务端发送矩形框信息：" + message);
-    textBrowser->append(QString("矩形框坐标: x=%1, y=%2, 尺寸: %3×%4\n")
-                       .arg(x)
-                       .arg(y)
-                       .arg(width)
-                       .arg(height));
+    textBrowser->append("服务端发送绝对矩形框信息：" + message);
+//    textBrowser->append(QString("绝对矩形框: x=%1, y=%2, 尺寸: %3×%4\n")
+//                       .arg(x)
+//                       .arg(y)
+//                       .arg(width)
+//                       .arg(height));
+}
+
+void Tcpserver::Tcp_sent_rect(float x, float y, float width, float height)
+{
+    // 构造归一化矩形框信息的字符串，保留4位小数
+    QString message = QString("RECT:%1:%2:%3:%4\r\n")
+                         .arg(QString::number(x, 'f', 4))
+                         .arg(QString::number(y, 'f', 4))
+                         .arg(QString::number(width, 'f', 4))
+                         .arg(QString::number(height, 'f', 4));
+    // 发送给所有连接的客户端
+    for (QTcpSocket* sock : clientSockets) {
+        if (sock->state() == QAbstractSocket::ConnectedState) {
+            sock->write(message.toUtf8());
+        }
+    }
+    // 在文本浏览器中显示发送的矩形框信息
+    textBrowser->append("服务端发送归一化矩形框信息：" + message);
+//    textBrowser->append(QString("归一化矩形框: x=%1, y=%2, 尺寸: %3×%4\n")
+//                       .arg(QString::number(x, 'f', 4))
+//                       .arg(QString::number(y, 'f', 4))
+//                       .arg(QString::number(width, 'f', 4))
+//                       .arg(QString::number(height, 'f', 4)));
 }
 
 void Tcpserver::Tcp_sent_list(const QSet<int>& objectIds)
@@ -353,7 +374,7 @@ void Tcpserver::Tcp_sent_list(const QSet<int>& objectIds)
     
     // 在文本浏览器中显示发送的对象列表信息
     textBrowser->append("服务端发送对象列表信息：" + message);
-    textBrowser->append(QString("选中对象数量: %1, 对象ID: %2\n")
-                       .arg(objectIds.size())
-                       .arg(idList.join(", ")));
+//    textBrowser->append(QString("选中对象数量: %1, 对象ID: %2\n")
+//                       .arg(objectIds.size())
+//                       .arg(idList.join(", ")));
 } 

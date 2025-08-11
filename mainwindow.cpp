@@ -4,12 +4,20 @@
 #include "controller.h"
 #include "Tcpserver.h"
 #include <QDebug>
+#include <QApplication>
+#include <QIcon>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_tcpServer(nullptr)
 {
-    // 设置主窗口大小为800x480
-    this->resize(800, 480);
+    // 设置主窗口大小为1000x600
+    this->resize(1000, 600);
+    
+    // 设置窗口图标
+    this->setWindowIcon(QIcon(":icon/lmx.png"));
+    
+    // 设置应用程序图标（在任务栏等地方显示）
+    QApplication::setWindowIcon(QIcon(":icon/lmx.png"));
 
     // 创建TCP服务器并自动启动监听
     m_tcpServer = new Tcpserver();
@@ -29,7 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 将TCP服务器指针传递给Controller
     controller->setTcpServer(m_tcpServer);
-    
+
     // 防止未使用变量警告
     Q_UNUSED(controller);
     // 设置视图为主窗口的中心部件

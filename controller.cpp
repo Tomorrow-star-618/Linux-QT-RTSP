@@ -8,6 +8,7 @@
 #include <QCoreApplication>
 #include "Picture.h"
 #include "Tcpserver.h" // Added for Tcpserver
+#include "common.h"
 Controller::Controller(Model* model, View* view, QObject* parent)
     : QObject(parent), m_model(model), m_view(view)
 {
@@ -28,9 +29,12 @@ Controller::Controller(Model* model, View* view, QObject* parent)
     }
     // 绑定更新视频流信号槽
     connect(m_model, &Model::frameReady, this, &Controller::onFrameReady);
-    
+
     // 绑定矩形框确认信号
     connect(m_view, &View::rectangleConfirmed, this, &Controller::onRectangleConfirmed);
+
+    // 绑定归一化矩形框信号
+    connect(m_view, &View::normalizedRectangleConfirmed, this, &Controller::onNormalizedRectangleConfirmed);
 }
 
 Controller::~Controller()
@@ -89,8 +93,9 @@ void Controller::saveImage()
         QMessageBox::warning(m_view, "提示", "当前没有可保存的图像！");
         return;
     }
-    // 确保picture文件夹存在
-    QDir dir(QCoreApplication::applicationDirPath() + "/picture");
+    // 确保picture文件夹存在（使用源码路径）
+    QString sourcePath = QString(__FILE__).section('/', 0, -2); // 获取源码目录路径
+    QDir dir(sourcePath + "/picture/save-picture");
     if (!dir.exists()) dir.mkpath(".");
     // 生成文件名
     QString fileName = dir.filePath(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz") + ".jpg");
@@ -114,6 +119,7 @@ void Controller::ButtonClickedHandler()
     case 0:
         qDebug() << "添加摄像头";
         Controller::onAddCameraClicked();
+        tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
         break;
 
     case 1:
@@ -121,10 +127,12 @@ void Controller::ButtonClickedHandler()
         if (!m_paused) {
             m_model->pauseStream();
             m_paused = true;
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 0);
             qDebug() << "已暂停";
         } else {
             m_model->resumeStream();
             m_paused = false;
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, RTSP_ENABLE, 1);
             qDebug() << "已恢复";
         }
         break;
@@ -149,10 +157,10 @@ void Controller::ButtonClickedHandler()
             // 切换绘制功能的启用状态
             bool currentState = m_view->isDrawingEnabled();
             m_view->enableDrawing(!currentState);
-            
+
             if (!currentState) {
                 // 启用绘制功能
-                QMessageBox::information(m_view, "绘框功能", 
+                QMessageBox::information(m_view, "绘框功能",
                     "绘框功能已启动！\n\n"
                     "使用方法：\n"
                     "1. 在视频区域按住鼠标左键\n"
@@ -169,14 +177,14 @@ void Controller::ButtonClickedHandler()
                 m_view->clearRectangle();
                 QMessageBox::information(m_view, "绘框功能", "绘框功能已关闭！");
             }
-            
+
             // 获取当前矩形框信息（如果有的话）
             RectangleBox currentRect = m_view->getCurrentRectangle();
             if (currentRect.width > 0 && currentRect.height > 0) {
-                qDebug() << "当前矩形框坐标:" 
-                         << "x=" << currentRect.x 
-                         << "y=" << currentRect.y 
-                         << "width=" << currentRect.width 
+                qDebug() << "当前矩形框坐标:"
+                         << "x=" << currentRect.x
+                         << "y=" << currentRect.y
+                         << "width=" << currentRect.width
                          << "height=" << currentRect.height;
             }
         }
@@ -191,7 +199,7 @@ void Controller::ButtonClickedHandler()
                 tcpWin->raise();
                 tcpWin->activateWindow();
             } else {
-                QMessageBox::warning(m_view, "TCP服务器状态", 
+                QMessageBox::warning(m_view, "TCP服务器状态",
                     "TCP服务器未启动！\n"
                     "请检查系统配置。");
             }
@@ -206,10 +214,10 @@ void Controller::ServoButtonClickedHandler()
     if (!clickedButton)
         return;
     int id = clickedButton->property("ButtonID").toInt();
-    
+
     // 获取当前步进值
     int stepValue = m_view->getStepValue();
-    
+
     switch (id)
     {
     case 0:
@@ -241,13 +249,13 @@ void Controller::FunButtonClickedHandler()
     QPushButton* clickedButton = qobject_cast<QPushButton*>(sender());
     if (!clickedButton)
         return;
-    
+
     int id = clickedButton->property("ButtonID").toInt();
     bool isChecked = clickedButton->isChecked();
-    
+
     // 更新按钮依赖关系
     updateButtonDependencies(id, isChecked);
-    
+
     switch (id)
     {
     case 0: // AI功能
@@ -264,7 +272,7 @@ void Controller::FunButtonClickedHandler()
             QMessageBox::information(m_view, "AI功能", "AI功能已关闭！");
         }
         break;
-        
+
     case 1: // 区域识别
         qDebug() << "区域识别按钮被点击";
         if (isChecked) {
@@ -275,9 +283,9 @@ void Controller::FunButtonClickedHandler()
             if (currentRect.width > 0 && currentRect.height > 0) {
                 // 有矩形框，通过TCP发送矩形框信息
                 if (tcpWin) {
-                    tcpWin->Tcp_sent_rect(currentRect.x, currentRect.y, 
+                    tcpWin->Tcp_sent_rect(currentRect.x, currentRect.y,
                                         currentRect.width, currentRect.height);
-                    QMessageBox::information(m_view, "区域识别", 
+                    QMessageBox::information(m_view, "区域识别",
                         QString("区域识别功能已开启！\n已发送矩形框信息：\n"
                                "坐标: (%1, %2)\n尺寸: %3×%4")
                         .arg(currentRect.x)
@@ -285,22 +293,37 @@ void Controller::FunButtonClickedHandler()
                         .arg(currentRect.width)
                         .arg(currentRect.height));
                 } else {
-                    QMessageBox::warning(m_view, "区域识别", 
+                    QMessageBox::warning(m_view, "区域识别",
                         "区域识别功能已开启！\n但TCP服务器未启动，无法发送矩形框信息。");
                 }
             } else {
                 // 没有矩形框，提示用户先绘制
-                QMessageBox::information(m_view, "区域识别", 
+                QMessageBox::information(m_view, "区域识别",
                     "区域识别功能已开启！\n请先绘制识别区域。");
             }
         } else {
             qDebug() << "区域识别已关闭";
             tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 0);
-            QMessageBox::information(m_view, "区域识别", "区域识别功能已关闭！");          
+            QMessageBox::information(m_view, "区域识别", "区域识别功能已关闭！");
         }
         break;
-        
-    case 2: // 对象列表
+
+    case 2: // 对象识别
+        qDebug() << "对象识别按钮被点击";
+        if (isChecked) {
+            qDebug() << "对象识别已开启";
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 1);
+            // 这里可以添加对象识别开启的逻辑
+            QMessageBox::information(m_view, "对象识别", "对象识别功能已开启！");
+        } else {
+            qDebug() << "对象识别已关闭";
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 0);
+            // 这里可以添加对象识别关闭的逻辑
+            QMessageBox::information(m_view, "对象识别", "对象识别功能已关闭！");
+        }
+        break;
+
+    case 3: // 对象列表
         qDebug() << "对象列表按钮被点击";
         {
             // 创建或显示对象检测列表窗口
@@ -308,23 +331,23 @@ void Controller::FunButtonClickedHandler()
                 m_detectList = new DetectList();
                 m_detectList->setAttribute(Qt::WA_DeleteOnClose); // 关闭时自动释放
                 // 连接对象检测列表的 selectionChanged 信号到 Controller 的槽函数
-                connect(m_detectList, &DetectList::selectionChanged, 
+                connect(m_detectList, &DetectList::selectionChanged,
                         this, &Controller::onDetectListSelectionChanged);
                 // 当 DetectList 窗口被销毁时，将 m_detectList 指针置为 nullptr
-                connect(m_detectList, &QObject::destroyed, 
+                connect(m_detectList, &QObject::destroyed,
                         [this]() { m_detectList = nullptr; });
             }
-            
+
             // 设置当前选中的对象
             m_detectList->setSelectedObjects(m_selectedObjectIds);
-            
+
             // 显示窗口
             m_detectList->show();
             m_detectList->raise();
             m_detectList->activateWindow();
         }
         break;
-        
+
     default:
         qDebug() << "未知功能按钮ID:" << id;
         break;
@@ -334,31 +357,31 @@ void Controller::FunButtonClickedHandler()
 void Controller::onDetectListSelectionChanged(const QSet<int>& selectedIds)
 {
     m_selectedObjectIds = selectedIds;
-    
+
     qDebug() << "对象检测列表选择已更新. Count:" << selectedIds.size();
-    
+
     // 获取对象名称列表
     QStringList objectNames = DetectList::getObjectNames();
     QStringList selectedNames;
-    
+
     // 根据选中的ID获取对应的对象名称
     for (int id : selectedIds) {
         if (id >= 0 && id < objectNames.size()) {
             selectedNames.append(objectNames[id]);
         }
     }
-    
+
     qDebug() << "选中的对象名称:" << selectedNames;
-    
+
     // 通过TCP发送对象列表信息
     if (tcpWin) {
         tcpWin->Tcp_sent_list(selectedIds);
-        QMessageBox::information(m_view, "对象检测设置", 
+        QMessageBox::information(m_view, "对象检测设置",
             QString("已选择 %1 个对象进行检测：\n\n%2\n\n对象列表已通过TCP发送！")
             .arg(selectedIds.size())
             .arg(selectedNames.isEmpty() ? "未选择任何对象" : selectedNames.join(", ")));
     } else {
-        QMessageBox::warning(m_view, "对象检测设置", 
+        QMessageBox::warning(m_view, "对象检测设置",
             QString("已选择 %1 个对象进行检测：\n\n%2\n\n但TCP服务器未启动，无法发送对象列表。")
             .arg(selectedIds.size())
             .arg(selectedNames.isEmpty() ? "未选择任何对象" : selectedNames.join(", ")));
@@ -368,14 +391,14 @@ void Controller::onDetectListSelectionChanged(const QSet<int>& selectedIds)
 void Controller::onRectangleConfirmed(const RectangleBox& rect)
 {
     qDebug() << "Controller接收到矩形框确认信号:" << rect.x << rect.y << rect.width << rect.height;
-    
+
     // 检查区域识别是否已开启
     QList<QPushButton*> funButtons = m_view->getFunButtons();
     if (funButtons.size() > 1 && funButtons[1]->isChecked()) {
         // 区域识别已开启，发送矩形框信息
         if (tcpWin) {
             tcpWin->Tcp_sent_rect(rect.x, rect.y, rect.width, rect.height);
-            QMessageBox::information(m_view, "区域识别", 
+            QMessageBox::information(m_view, "区域识别",
                 QString("矩形框已确认并发送！\n"
                        "坐标: (%1, %2)\n尺寸: %3×%4")
                 .arg(rect.x)
@@ -383,8 +406,33 @@ void Controller::onRectangleConfirmed(const RectangleBox& rect)
                 .arg(rect.width)
                 .arg(rect.height));
         } else {
-            QMessageBox::warning(m_view, "区域识别", 
+            QMessageBox::warning(m_view, "区域识别",
                 "矩形框已确认！\n但TCP服务器未启动，无法发送矩形框信息。");
+        }
+    }
+}
+
+void Controller::onNormalizedRectangleConfirmed(const NormalizedRectangleBox& normRect, const RectangleBox& absRect)
+{
+    qDebug() << "Controller接收到归一化矩形框信号:" << normRect.x << normRect.y << normRect.width << normRect.height;
+    qDebug() << "Controller接收到原始矩形框信号:" << absRect.x << absRect.y << absRect.width << absRect.height;
+
+    // 检查区域识别是否已开启
+    QList<QPushButton*> funButtons = m_view->getFunButtons();
+    if (funButtons.size() > 1 && funButtons[1]->isChecked()) {
+        // 区域识别已开启，发送归一化矩形框信息
+        if (tcpWin) {
+            tcpWin->Tcp_sent_rect(normRect.x, normRect.y, normRect.width, normRect.height);
+            QMessageBox::information(m_view, "区域识别",
+                QString("归一化矩形框已确认并发送！\n"
+                       "归一化坐标: (%.4f, %.4f)\n归一化尺寸: %.4f×%.4f")
+                    .arg(normRect.x, 0, 'f', 4)
+                    .arg(normRect.y, 0, 'f', 4)
+                    .arg(normRect.width, 0, 'f', 4)
+                    .arg(normRect.height, 0, 'f', 4));
+        } else {
+            QMessageBox::warning(m_view, "区域识别",
+                "归一化矩形框已确认！\n但TCP服务器未启动，无法发送矩形框信息。");
         }
     }
 }
@@ -393,35 +441,48 @@ void Controller::updateButtonDependencies(int clickedButtonId, bool isChecked)
 {
     QList<QPushButton*> funButtons = m_view->getFunButtons();
     if (funButtons.size() < 3) return;
-    
+
     switch (clickedButtonId) {
     case 0: // AI功能按钮
         if (!isChecked) {
             // AI功能关闭时，同时关闭区域识别
             QPushButton* areaRecognitionBtn = funButtons[1];
-            if (areaRecognitionBtn->isChecked()) {
+            QPushButton* objectRecognitionBtn = funButtons[2];
+            if (areaRecognitionBtn->isChecked() || objectRecognitionBtn->isChecked()) {
                 areaRecognitionBtn->setChecked(false);
-                qDebug() << "AI功能已关闭，同时关闭区域识别";
-                QMessageBox::information(m_view, "区域识别", "AI功能已关闭，区域识别功能也已关闭！");
+                objectRecognitionBtn->setChecked(false);
+                qDebug() << "AI功能已关闭，同时关闭区域识别与对象识别";
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, 0);
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, 0);
+                QMessageBox::information(m_view, "区域识别", "AI功能已关闭，区域识别与对象识别功能也已关闭！");
             }
         }
         break;
-        
+
     case 1: // 区域识别按钮
         if (isChecked) {
             // 区域识别开启时，确保AI功能也开启
             QPushButton* aiBtn = funButtons[0];
             if (!aiBtn->isChecked()) {
                 aiBtn->setChecked(true);
-                qDebug() << "区域识别需要AI功能，自动开启AI功能";               
+                qDebug() << "区域识别需要AI功能，自动开启AI功能";
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
                 QMessageBox::information(m_view, "AI功能", "区域识别功能需要AI功能支持，已自动开启AI功能！");
             }
         }
         break;
-        
-    case 2: // 对象列表按钮 - 独立功能，不依赖其他按钮
-        // 对象列表是独立功能，不需要特殊处理
+
+    case 2: // 对象识别按钮
+        if (isChecked) {
+            // 对象识别开启时，确保AI功能也开启
+            QPushButton* aiBtn = funButtons[0];
+            if (!aiBtn->isChecked()) {
+                aiBtn->setChecked(true);
+                qDebug() << "对象识别需要AI功能，自动开启AI功能";
+                tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, 1);
+                QMessageBox::information(m_view, "AI功能", "对象识别功能需要AI功能支持，已自动开启AI功能！");
+            }
+        }
         break;
     }
 }
-

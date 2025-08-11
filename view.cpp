@@ -72,7 +72,7 @@ void View::initleft()
 
     // 将功能按钮面板和视频标签添加到左侧布局
     leftLayout->addWidget(funPanel,1);
-    leftLayout->addWidget(videoLabel,6);
+    leftLayout->addWidget(videoLabel,8);
 }
 
 void View::initright()
@@ -112,8 +112,15 @@ void View::initFunButtons()
     )");
 
     // 功能按钮文本
-    QStringList btnNames = {"AI功能", "区域识别", "对象列表"};
-    
+    QStringList btnNames = {"AI功能", "区域识别", "对象识别", "对象列表"};
+    // 图表路径
+    QStringList tabIconPaths = {
+        ":icon/AI.png",
+        ":icon/rect.png",
+        ":icon/object.png",
+        ":icon/list.png",
+    };
+
     // 功能按钮样式
     QString funBtnStyle = R"(
         QPushButton {
@@ -151,14 +158,16 @@ void View::initFunButtons()
         QPushButton* btn = new QPushButton(btnNames[i], funPanel); // 创建按钮并设置父级为funPanel
         btn->setStyleSheet(funBtnStyle); // 应用按钮样式
         btn->setProperty("ButtonID", i); // 设置自定义属性用于区分按钮
-
+        btn->setIcon(QIcon(tabIconPaths[i]));                        // 设置按钮图标
+        btn->setIconSize(QSize(32, 32));                             // 设置图标大小
+        btn->setLayoutDirection(Qt::LeftToRight);                    // 图标在左，文字在右
         // 设置按钮的可选属性
-        if (i < 2) {
-            // 前两个按钮（AI功能和区域识别）为可选按钮
+        if (i < 3) {
+            // 前三个按钮（AI功能、区域识别、对象识别）为可选按钮
             btn->setCheckable(true);
             btn->setChecked(false);
         } else {
-            // 第三个按钮（对象列表）为普通按钮
+            // 第四个按钮（对象列表）为普通按钮
             btn->setCheckable(false);
         }
         // 将按钮添加到布局中
@@ -223,7 +232,7 @@ void View::initButtons()
         ":icon/closevideo.png",
         ":icon/screenshot.png",
         ":icon/album.png",
-        ":icon/tcp.png",
+        ":icon/draw.png",
         ":icon/tcp.png"
     };
 
@@ -377,7 +386,19 @@ void View::onRectangleConfirmed(const RectangleBox& rect)
     m_hasRectangle = true;
     qDebug() << "View接收到矩形框确认信号:" << rect.x << rect.y << rect.width << rect.height;
     
-    // 发出矩形框确认信号，通知Controller,由controller再发送Tcp_sent_info到Tcpserver
+    // 归一化处理
+    int labelW = videoLabel->width();
+    int labelH = videoLabel->height();
+    NormalizedRectangleBox normRect;
+    normRect.x = static_cast<float>(rect.x) / labelW;
+    normRect.y = static_cast<float>(rect.y) / labelH;
+    normRect.width = static_cast<float>(rect.width) / labelW;
+    normRect.height = static_cast<float>(rect.height) / labelH;
+    
+    // 发射归一化信号
+    emit normalizedRectangleConfirmed(normRect, rect);
+
+    // 兼容原有信号
     emit rectangleConfirmed(rect);
 }
 

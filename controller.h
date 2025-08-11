@@ -25,8 +25,10 @@ public slots:
 private slots:
     void onAddCameraClicked();      //添加摄像头槽
     void onFrameReady(const QImage& img); //视频帧槽
-    void onDetectListSelectionChanged(const QSet<int>& selectedIds); //对象列表选择变化槽
-    void onRectangleConfirmed(const RectangleBox& rect);
+    void onDetectListSelectionChanged(const QSet<int>& selectedIds); //对象列表选择变化槽 
+    void onRectangleConfirmed(const RectangleBox& rect);// 处理用户确认的矩形框（绝对坐标），用于目标选定等功能
+    // 处理用户确认的矩形框（归一化坐标和绝对坐标），便于后续处理如检测、标注等
+    void onNormalizedRectangleConfirmed(const NormalizedRectangleBox& normRect, const RectangleBox& absRect);
 
 private:
     Model* m_model; //模型指针  

@@ -24,6 +24,7 @@ HEADERS += \
     Picture.h \
     Tcpserver.h \
     VideoLabel.h \
+    common.h \
     detectlist.h \
     mainwindow.h \
     model.h \

@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QRect>
 #include "VideoLabel.h"
+#include "common.h"
 
 class View : public QWidget {
     Q_OBJECT
@@ -32,6 +33,7 @@ public:
 
 signals:
     void rectangleConfirmed(const RectangleBox& rect); // 矩形框确认信号
+    void normalizedRectangleConfirmed(const NormalizedRectangleBox& rect, const RectangleBox& absRect); // 归一化矩形框信号
 
 private slots:
     void onRectangleDrawn(const RectangleBox& rect); // 处理矩形框绘制完成

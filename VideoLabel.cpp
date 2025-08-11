@@ -233,16 +233,16 @@ void VideoLabel::drawRectangle(QPainter& painter)
         QRect drawRect(m_rectangle.x, m_rectangle.y, m_rectangle.width, m_rectangle.height);
         
         if (m_rectangleConfirmed) {
-            // 确认后只显示绿色边框，不显示填充
-            QPen pen(Qt::green, 2, Qt::SolidLine);
+            // 确认后只显示蓝色边框，不显示填充
+            QPen pen(Qt::blue, 2, Qt::SolidLine);
             painter.setPen(pen);
             painter.drawRect(drawRect);
         } else {
             // 未确认时显示半透明填充和实线边框
-            QColor fillColor(0, 255, 0, 40); // 绿色，40%透明度
+            QColor fillColor(0, 0, 255, 40); // 蓝色，40%透明度
             painter.fillRect(drawRect, fillColor);
             
-            QPen pen(Qt::green, 2, Qt::SolidLine);
+            QPen pen(Qt::blue, 2, Qt::SolidLine);
             painter.setPen(pen);
             painter.drawRect(drawRect);
             

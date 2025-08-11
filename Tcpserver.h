@@ -33,7 +33,9 @@ enum OperationID {
 
     // 摄像头操作ID
     CAMERA_AI_ENABLE = 6,      // AI使能
-    CAMERA_REGION_ENABLE = 7   // 区域使能
+    CAMERA_REGION_ENABLE = 7,  // 区域使能
+    CAMERA_OBJECT_ENABLE = 8,  // 对象使能
+    RTSP_ENABLE = 9            // RTSP使能
 }; 
 
 class TcpServerThread;
@@ -46,6 +48,7 @@ public:
 
     void Tcp_sent_info(int deviceId, int operationId, int operationValue);  // 发送设备操作信息
     void Tcp_sent_rect(int x, int y, int width, int height);    // 发送矩形框信息  
+    void Tcp_sent_rect(float x, float y, float width, float height);
     void Tcp_sent_list(const QSet<int>& objectIds); // 发送目标ID列表
     void startListen();                // 开始监听
     void stopListen();                 // 停止监听
