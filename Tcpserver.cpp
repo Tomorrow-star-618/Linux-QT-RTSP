@@ -218,6 +218,8 @@ void Tcpserver::clientConnected()
     if (comboBox->findText(portStr) == -1) {
         comboBox->addItem(portStr);
     }
+    // 发射客户端连接成功信号
+    emit tcpClientConnected(ip, port);
 }
 
 void Tcpserver::receiveMessages()

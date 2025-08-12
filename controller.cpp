@@ -8,6 +8,7 @@
 #include <QCoreApplication>
 #include "Picture.h"
 #include "Tcpserver.h" // Added for Tcpserver
+#include "plan.h"      // Added for Plan and PlanData
 #include "common.h"
 Controller::Controller(Model* model, View* view, QObject* parent)
     : QObject(parent), m_model(model), m_view(view)
@@ -35,6 +36,11 @@ Controller::Controller(Model* model, View* view, QObject* parent)
 
     // 绑定归一化矩形框信号
     connect(m_view, &View::normalizedRectangleConfirmed, this, &Controller::onNormalizedRectangleConfirmed);
+
+    // 如果稍后设置tcpWin，也会在setTcpServer中再连接
+    if (tcpWin) {
+        connect(tcpWin, &Tcpserver::tcpClientConnected, this, &Controller::onTcpClientConnected);
+    }
 }
 
 Controller::~Controller()
@@ -46,6 +52,9 @@ Controller::~Controller()
 void Controller::setTcpServer(Tcpserver* tcpServer)
 {
     tcpWin = tcpServer;
+    if (tcpWin) {
+        connect(tcpWin, &Tcpserver::tcpClientConnected, this, &Controller::onTcpClientConnected);
+    }
 }
 
 // 添加摄像头按钮点击处理函数
@@ -224,6 +233,10 @@ void Controller::ButtonClickedHandler()
             }
         }
         break;
+
+    default:
+        qDebug() << "未知功能按钮ID:" << id;
+        break;
     }
 }
 
@@ -385,6 +398,28 @@ void Controller::FunButtonClickedHandler()
             m_detectList->show();
             m_detectList->raise();
             m_detectList->activateWindow();
+        }
+        break;
+
+    case 4: //方案预选
+        qDebug() << "方案预选按钮被点击";
+        {
+            // 创建或显示方案预选窗口
+            if (!m_plan) {
+                m_plan = new Plan();
+                m_plan->setAttribute(Qt::WA_DeleteOnClose); // 关闭时自动释放
+                // 连接方案应用信号到Controller的槽函数
+                connect(m_plan, &Plan::planApplied,
+                        this, &Controller::onPlanApplied);
+                // 当Plan窗口被销毁时，将m_plan指针置为nullptr
+                connect(m_plan, &QObject::destroyed,
+                        [this]() { m_plan = nullptr; });
+            }
+
+            // 显示窗口
+            m_plan->show();
+            m_plan->raise();
+            m_plan->activateWindow();
         }
         break;
 
@@ -553,5 +588,115 @@ void Controller::updateButtonDependencies(int clickedButtonId, bool isChecked)
         }
         break;
     }
+}
+
+void Controller::onTcpClientConnected(const QString& ip, quint16 port)
+{
+    QString msg = QString("TCP成功连接 客户端IP:%1 端口:%2").arg(ip).arg(port);
+    m_view->addEventMessage("success", msg);
+}
+
+void Controller::onPlanApplied(const PlanData& plan)
+{
+    qDebug() << "Controller接收到方案应用信号:" << plan.name;
+    
+    // 应用RTSP地址 - 自动启动视频流
+    if (!plan.rtspUrl.isEmpty()) {
+        m_model->startStream(plan.rtspUrl);
+        m_view->addEventMessage("info", QString("已设置RTSP地址: %1").arg(plan.rtspUrl));
+    }
+    
+    // 获取功能按钮列表
+    QList<QPushButton*> funButtons = m_view->getFunButtons();
+    if (funButtons.size() < 3) {
+        m_view->addEventMessage("error", "功能按钮获取失败");
+        return;
+    }
+    
+    // 检查TCP连接状态
+    if (!(tcpWin && tcpWin->hasConnectedClients())) {
+        QMessageBox::warning(m_view, "TCP连接状态", 
+            "当前没有TCP连接，部分功能可能无法正常工作。\n请先建立TCP连接。");
+        m_view->addEventMessage("warning", "应用方案时检测到没有TCP连接");
+        return;
+    }
+    
+    // 应用AI功能设置
+    QPushButton* aiBtn = funButtons[0];
+    if (aiBtn->isChecked() != plan.aiEnabled) {
+        aiBtn->setChecked(plan.aiEnabled);
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_AI_ENABLE, plan.aiEnabled ? 1 : 0);
+        }
+        m_view->addEventMessage("info", QString("AI功能已%1").arg(plan.aiEnabled ? "启用" : "禁用"));
+    }
+    
+    // 应用区域识别设置
+    QPushButton* regionBtn = funButtons[1];
+    if (regionBtn->isChecked() != plan.regionEnabled) {
+        regionBtn->setChecked(plan.regionEnabled);
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_REGION_ENABLE, plan.regionEnabled ? 1 : 0);
+        }
+        m_view->addEventMessage("info", QString("区域识别功能已%1").arg(plan.regionEnabled ? "启用" : "禁用"));
+    }
+    
+    // 应用对象识别设置
+    QPushButton* objectBtn = funButtons[2];
+    if (objectBtn->isChecked() != plan.objectEnabled) {
+        objectBtn->setChecked(plan.objectEnabled);
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            tcpWin->Tcp_sent_info(DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, plan.objectEnabled ? 1 : 0);
+        }
+        m_view->addEventMessage("info", QString("对象识别功能已%1").arg(plan.objectEnabled ? "启用" : "禁用"));
+    }
+    
+    // 应用对象列表设置
+    if (!plan.objectList.isEmpty()) {
+        m_selectedObjectIds = plan.objectList;
+        
+        // 如果对象检测列表窗口已打开，更新其选择状态
+        if (m_detectList) {
+            m_detectList->setSelectedObjects(m_selectedObjectIds);
+        }
+        
+        // 通过TCP发送对象列表
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            tcpWin->Tcp_sent_list(m_selectedObjectIds);
+            
+            // 获取对象名称列表用于显示
+            QStringList objectNames = DetectList::getObjectNames();
+            QStringList selectedNames;
+            for (int id : m_selectedObjectIds) {
+                if (id >= 0 && id < objectNames.size()) {
+                    selectedNames.append(objectNames[id]);
+                }
+            }
+            
+            m_view->addEventMessage("info", QString("已设置检测对象列表(%1个): %2")
+                .arg(m_selectedObjectIds.size())
+                .arg(selectedNames.join(", ")));
+        } else {
+            m_view->addEventMessage("warning", "对象列表已设置，但无TCP连接无法发送");
+        }
+    }
+    
+    // // 显示应用成功消息
+    // QMessageBox::information(m_view, "方案应用成功", 
+    //     QString("方案 \"%1\" 已成功应用！\n\n"
+    //            "配置详情：\n"
+    //            "• RTSP地址: %2\n"
+    //            "• AI功能: %3\n"
+    //            "• 区域识别: %4\n"
+    //            "• 对象识别: %5\n"
+    //            "• 检测对象: %6个")
+    //     .arg(plan.name)
+    //     .arg(plan.rtspUrl)
+    //     .arg(plan.aiEnabled ? "启用" : "禁用")
+    //     .arg(plan.regionEnabled ? "启用" : "禁用")
+    //     .arg(plan.objectEnabled ? "启用" : "禁用")
+    //     .arg(plan.objectList.size()));
+    
+    m_view->addEventMessage("success", QString("方案 \"%1\" 应用成功！").arg(plan.name));
 }
 

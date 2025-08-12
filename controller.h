@@ -7,6 +7,11 @@
 #include "VideoLabel.h"  // 包含RectangleBox定义
 #include "detectlist.h"  // 包含DetectList类
 
+class Plan; // 前向声明
+
+// 方案数据结构前向声明
+struct PlanData;
+
 class Controller : public QObject {
     Q_OBJECT
 public:
@@ -20,6 +25,7 @@ public slots:
     void ButtonClickedHandler();      //主界面标签按键槽
     void ServoButtonClickedHandler(); //云台按键槽
     void FunButtonClickedHandler();   //功能按钮槽
+    void onTcpClientConnected(const QString& ip, quint16 port); // 新增：处理TCP客户端连接成功
 
         
 private slots:
@@ -29,6 +35,7 @@ private slots:
     void onRectangleConfirmed(const RectangleBox& rect);// 处理用户确认的矩形框（绝对坐标），用于目标选定等功能
     // 处理用户确认的矩形框（归一化坐标和绝对坐标），便于后续处理如检测、标注等
     void onNormalizedRectangleConfirmed(const NormalizedRectangleBox& normRect, const RectangleBox& absRect);
+    void onPlanApplied(const PlanData& plan); // 处理方案应用槽
 
 private:
     Model* m_model; //模型指针  
@@ -38,8 +45,9 @@ private:
     void saveImage();   // 截图保存函数
     Tcpserver* tcpWin = nullptr; // TCP服务器窗口指针
     DetectList* m_detectList = nullptr; // 对象检测列表窗口指针
+    Plan* m_plan = nullptr; // 方案预选窗口指针
     QSet<int> m_selectedObjectIds; // 当前选中的对象ID集合
     
     // 功能按钮状态管理
     void updateButtonDependencies(int clickedButtonId, bool isChecked);
-}; 
+};

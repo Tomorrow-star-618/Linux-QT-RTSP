@@ -1,4 +1,4 @@
-QT       += core gui network
+QT       += core gui network sql
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -18,7 +18,8 @@ SOURCES += \
     mainwindow.cpp \
     model.cpp \
     view.cpp \
-    controller.cpp
+    controller.cpp \
+    plan.cpp
 
 HEADERS += \
     Picture.h \
@@ -29,7 +30,8 @@ HEADERS += \
     mainwindow.h \
     model.h \
     view.h \
-    controller.h
+    controller.h \
+    plan.h
 
 FORMS += \
     mainwindow.ui

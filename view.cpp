@@ -169,14 +169,15 @@ void View::initFunButtons()
         }
     )");
 
-    // 功能按钮文本
-    QStringList btnNames = {"AI功能", "区域识别", "对象识别", "对象列表"};
-    // 图表路径
+    // 功能按钮文本 (新增第五个普通按钮: 方案预选)
+    QStringList btnNames = {"AI功能", "区域识别", "对象识别", "对象列表", "方案预选"};
+    // 图标路径(临时复用 对象列表 图标)
     QStringList tabIconPaths = {
         ":icon/AI.png",
         ":icon/rect.png",
         ":icon/object.png",
         ":icon/list.png",
+        ":icon/list.png" // 方案预选 暂用
     };
 
     // 功能按钮样式
@@ -225,7 +226,7 @@ void View::initFunButtons()
             btn->setCheckable(true);
             btn->setChecked(false);
         } else {
-            // 第四个按钮（对象列表）为普通按钮
+            // 其余按钮为普通按钮
             btn->setCheckable(false);
         }
         // 将按钮添加到布局中

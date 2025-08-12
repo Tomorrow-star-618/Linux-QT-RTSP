@@ -54,6 +54,9 @@ public:
     void stopListen();                 // 停止监听
     bool hasConnectedClients() const;  // 判断是否有已连接客户端
 
+signals:
+    void tcpClientConnected(const QString& ip, quint16 port); // 新增：客户端连接成功信号
+
 private slots:
     void clearTextBrowser();           // 清空文本显示
     void sendMessages();               // 发送消息给客户端
