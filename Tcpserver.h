@@ -54,8 +54,12 @@ public:
     void stopListen();                 // 停止监听
     bool hasConnectedClients() const;  // 判断是否有已连接客户端
 
+    // 公有成员：文本显示区（为了让Controller能够访问）
+    QTextBrowser* textBrowser;         // 文本显示区
+
 signals:
     void tcpClientConnected(const QString& ip, quint16 port); // 新增：客户端连接成功信号
+    void detectionDataReceived(const QString& detectionData); // 新增：检测数据接收信号
 
 private slots:
     void clearTextBrowser();           // 清空文本显示
@@ -67,6 +71,7 @@ private slots:
 
 private:
     void getLocalHostIP();             // 获取本地所有IP
+    void processDetectionData(const QString& data); // 新增：处理检测数据
     QTcpServer* tcpServer;             // TCP服务器对象
     QList<QTcpSocket*> clientSockets;  // 已连接的客户端socket列表
     QPushButton* pushButton[5];        // 按钮数组
@@ -75,7 +80,6 @@ private:
     QLineEdit* Sent_lineEdit;          // 发送消息输入框
     QComboBox* comboBox;               // 客户端端口选择下拉框
     QSpinBox* spinBox;                 // 监听端口号选择框
-    QTextBrowser* textBrowser;         // 文本显示区
     QVBoxLayout* vBoxLayout;           // 垂直布局
     QHBoxLayout* hBoxLayout[4];        // 水平布局数组
     QWidget* hWidget[3];               // 水平布局用的widget

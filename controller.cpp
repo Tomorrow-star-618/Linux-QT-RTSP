@@ -40,6 +40,7 @@ Controller::Controller(Model* model, View* view, QObject* parent)
     // 如果稍后设置tcpWin，也会在setTcpServer中再连接
     if (tcpWin) {
         connect(tcpWin, &Tcpserver::tcpClientConnected, this, &Controller::onTcpClientConnected);
+        connect(tcpWin, &Tcpserver::detectionDataReceived, this, &Controller::onDetectionDataReceived);
     }
 }
 
@@ -54,6 +55,7 @@ void Controller::setTcpServer(Tcpserver* tcpServer)
     tcpWin = tcpServer;
     if (tcpWin) {
         connect(tcpWin, &Tcpserver::tcpClientConnected, this, &Controller::onTcpClientConnected);
+        connect(tcpWin, &Tcpserver::detectionDataReceived, this, &Controller::onDetectionDataReceived);
     }
 }
 
@@ -116,6 +118,33 @@ void Controller::saveImage()
     } else {
         QMessageBox::critical(m_view, "保存失败", "图片保存失败！");
         m_view->addEventMessage("error", "图片保存失败！");
+    }
+}
+
+void Controller::saveAlarmImage(const QString& detectionInfo)
+{
+    if (m_lastImage.isNull()) {
+        qDebug() << "警告：当前没有可保存的图像！";
+        m_view->addEventMessage("warning", "检测到目标但当前没有可保存的图像！");
+        return;
+    }
+    
+    // 确保报警图片目录存在（使用源码路径）
+    QString sourcePath = QString(__FILE__).section('/', 0, -2); // 获取源码目录路径
+    QDir dir(sourcePath + "/picture/alarm-picture");
+    if (!dir.exists()) {
+        dir.mkpath("."); // 创建目录
+    }
+    
+    // 生成报警图片文件名，包含时间戳和检测信息
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
+    QString fileName = dir.filePath(QString("ALARM_%1.jpg").arg(timestamp));
+    
+    // 保存图像
+    if (m_lastImage.save(fileName)) {
+        QString successMsg = QString("检测到目标，报警图片已保存: %1").arg(fileName);
+        qDebug() << successMsg;
+        m_view->addEventMessage("alarm", successMsg);
     }
 }
 
@@ -698,5 +727,16 @@ void Controller::onPlanApplied(const PlanData& plan)
     //     .arg(plan.objectList.size()));
     
     m_view->addEventMessage("success", QString("方案 \"%1\" 应用成功！").arg(plan.name));
+}
+
+void Controller::onDetectionDataReceived(const QString& detectionData)
+{
+    qDebug() << "Controller接收到检测数据:" << detectionData;
+    
+    // 记录检测事件到消息系统（直接显示处理后的数据）
+    m_view->addEventMessage("info", QString("🎯 检测到目标: %1").arg(detectionData));
+    
+    // 调用报警图像保存函数
+    saveAlarmImage(detectionData);
 }
 

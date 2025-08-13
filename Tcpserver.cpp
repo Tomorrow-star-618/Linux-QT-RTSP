@@ -27,7 +27,7 @@ Tcpserver::Tcpserver(QWidget* parent)
     comboBox->setFixedWidth(80); // 设置宽度为80
     comboBox->addItem("all"); // 初始添加all选项
     
-    Ip_lineEdit = new QLineEdit("192.168.1.155");  
+    Ip_lineEdit = new QLineEdit("192.168.1.156");  
     Sent_lineEdit = new QLineEdit("TCPserver_sent_info");
 
     spinBox = new QSpinBox();
@@ -227,12 +227,20 @@ void Tcpserver::receiveMessages()
     // 获取发送消息的客户端socket
     QTcpSocket* senderSocket = qobject_cast<QTcpSocket*>(sender());
     if (!senderSocket) return; // 如果获取失败则直接返回
+    
     // 获取客户端端口号
     quint16 port = senderSocket->peerPort();
-    // 读取客户端发送的全部数据，并格式化显示
-    QString messages = QString("客户端[%1]：%2").arg(port).arg(QString::fromUtf8(senderSocket->readAll()));
-    // 在文本浏览器中显示客户端消息
-    textBrowser->append(messages);
+    
+    // 读取客户端发送的全部数据
+    QByteArray data = senderSocket->readAll();
+    QString message = QString::fromUtf8(data);
+    
+    // 格式化显示普通消息
+    QString displayMessage = QString("客户端[%1]：%2").arg(port).arg(message);
+    textBrowser->append(displayMessage);
+    
+    // 检查是否为检测数据并进行处理
+    processDetectionData(message);
 }
 
 void Tcpserver::lockip()
@@ -389,4 +397,62 @@ bool Tcpserver::hasConnectedClients() const
         }
     }
     return false;
+}
+
+// 处理检测数据的函数，当接收到DETECTIONS格式的数据时触发图像保存
+void Tcpserver::processDetectionData(const QString& data)
+{
+    // 去除首尾空白字符并检查数据是否以DETECTIONS开头
+    QString trimmedData = data.trimmed();
+    if (!trimmedData.startsWith("DETECTIONS")) {
+        return; // 不是检测数据格式，直接返回
+    }
+    
+    // 解析检测数据格式：DETECTIONS:6|0:person:209:2:506:475:0.843|62:tv:633:313:57:62:0.774|...
+    QStringList parts = trimmedData.split(":");
+    if (parts.size() < 2) {
+        // 数据格式不正确，记录错误信息
+        textBrowser->append("⚠️ 检测数据格式错误：" + trimmedData);
+        return;
+    }
+    
+    // 提取检测对象数量和详细信息
+    QString detectionInfo = parts[1]; // 获取"6|0:person:209:2:506:475:0.843|62:tv:..."部分
+    QStringList objectParts = detectionInfo.split("|");
+    
+    if (objectParts.isEmpty()) {
+        textBrowser->append("⚠️ 检测数据为空");
+        return;
+    }
+    
+    // 第一个部分是对象总数
+    int totalObjects = objectParts[0].toInt();
+    
+    // 解析每个检测对象的信息
+    QStringList categories;
+    int objectIndex = 1;
+    
+    for (int i = 1; i < objectParts.size(); ++i) {
+        QString objectInfo = objectParts[i];
+        QStringList objectDetails = objectInfo.split(":");
+        
+        // 格式：class_id:class_name:x:y:width:height:confidence
+        if (objectDetails.size() >= 2) {
+            QString className = objectDetails[1]; // 获取类别名称
+            categories.append(QString("%1:%2").arg(objectIndex).arg(className));
+            objectIndex++;
+        }
+    }
+    
+    // 构建处理后的数据格式
+    QString processedData;
+    if (!categories.isEmpty()) {
+        processedData = QString("%1个物体,%2").arg(totalObjects).arg(categories.join(";"));
+    } else {
+        processedData = QString("%1个物体").arg(totalObjects);
+    }
+    
+    
+    // 发射信号给controller，传递处理后的数据
+    emit detectionDataReceived(processedData);
 }
