@@ -83,6 +83,162 @@
 
 ---
 
+## 📚 使用教程
+
+### 🔧 环境配置
+
+#### 1️⃣ 安装Qt 5.12.9
+
+在Linux环境下安装Qt 5.12.9开发环境：
+
+```bash
+# 下载Qt 5.12.9安装包
+wget https://download.qt.io/archive/qt/5.12/5.12.9/qt-opensource-linux-x64-5.12.9.run
+
+# 给安装包执行权限
+chmod +x qt-opensource-linux-x64-5.12.9.run
+
+# 运行安装程序
+./qt-opensource-linux-x64-5.12.9.run
+```
+
+> 💡 **提示**: 安装过程中请选择Qt Creator和MinGW编译器
+
+#### 2️⃣ 安装FFmpeg库文件
+
+更新系统包列表并安装FFmpeg：
+
+```bash
+# 更新包列表
+sudo apt update
+
+# 安装FFmpeg及其开发库
+sudo apt install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+```
+
+#### 3️⃣ 查找库文件安装路径
+
+使用以下命令查找FFmpeg库文件的安装路径：
+
+```bash
+# 查找avcodec库路径
+/sbin/ldconfig -p | grep avcodec
+
+# 查找avformat库路径
+/sbin/ldconfig -p | grep avformat
+
+# 查找avutil库路径
+/sbin/ldconfig -p | grep avutil
+
+# 查找swscale库路径
+/sbin/ldconfig -p | grep swscale
+```
+
+**示例输出**:
+```
+libavcodec.so.58 (libc6,x86-64) => /usr/lib/x86_64-linux-gnu/libavcodec.so.58
+libavformat.so.58 (libc6,x86-64) => /usr/lib/x86_64-linux-gnu/libavformat.so.58
+libavutil.so.56 (libc6,x86-64) => /usr/lib/x86_64-linux-gnu/libavutil.so.56
+libswscale.so.5 (libc6,x86-64) => /usr/lib/x86_64-linux-gnu/libswscale.so.5
+```
+
+#### 4️⃣ 配置Qt项目文件
+
+打开`rtsp.pro`文件，找到`# FFmpeg 库文件路径`注释部分，替换为实际的库文件路径：
+
+```pro
+# FFmpeg 库文件路径 (根据步骤3查找到的路径进行配置)
+LIBS += -L/usr/lib/x86_64-linux-gnu/ -lavcodec -lavformat -lavutil -lswscale
+
+# FFmpeg 头文件路径
+INCLUDEPATH += /usr/include/x86_64-linux-gnu
+INCLUDEPATH += /usr/include
+```
+
+### 🌐 网络配置
+
+#### 5️⃣ 查询虚拟机IP地址
+
+使用`ifconfig`命令查询当前虚拟机的IP地址：
+
+```bash
+ifconfig
+```
+
+**示例输出**:
+```
+ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.1.156  netmask 255.255.255.0  broadcast 192.168.1.255
+        ...
+```
+
+> ⚠️ **注意**: 确保虚拟机IP与RV1106设备IP在同一局域网下，推荐将虚拟机配置为**桥接模式**。
+
+#### 6️⃣ 修改TCP服务器监听地址
+
+打开`Tcpserver.cpp`文件，找到IP地址初始化代码：
+
+```cpp
+// 修改前
+Ip_lineEdit = new QLineEdit("192.168.1.156");
+
+// 修改为步骤5查询到的虚拟机IP地址
+Ip_lineEdit = new QLineEdit("你的虚拟机IP地址");
+```
+
+**例如**:
+```cpp
+Ip_lineEdit = new QLineEdit("192.168.1.100");  // 替换为实际IP
+```
+
+### 🚀 运行与使用
+
+#### 7️⃣ 启动应用程序
+
+1. **编译项目**: 在Qt Creator中打开项目并编译
+2. **运行程序**: 点击运行按钮启动应用
+3. **选择配置方式**:
+
+##### 方式一：手动添加摄像头
+1. 点击"添加视频"按钮
+2. 输入RTSP地址: `rtsp://RV1106地址/live/0`
+3. 点击确认开始视频流播放
+
+##### 方式二：使用方案预设
+1. 点击"方案预选"按钮
+2. 选择预设的监控方案
+3. 点击"应用方案"一键配置
+
+> 🔗 **RTSP地址格式**: `rtsp://192.168.1.100/live/0`  
+> 其中`192.168.1.100`为RV1106设备的实际IP地址
+
+### ✅ 验证安装
+
+#### 检查项目清单
+
+- [ ] Qt 5.12.9 安装完成
+- [ ] FFmpeg库文件安装成功
+- [ ] 库文件路径配置正确
+- [ ] 虚拟机与RV1106在同一网络
+- [ ] TCP服务器IP地址配置正确
+- [ ] 项目编译无错误
+- [ ] 视频流连接成功
+
+### 🔧 常见问题
+
+#### 编译错误
+- **问题**: 找不到FFmpeg头文件
+- **解决**: 检查INCLUDEPATH配置是否正确
+
+#### 网络连接失败
+- **问题**: 无法连接到RV1106设备
+- **解决**: 检查IP地址和网络连通性
+
+#### 视频流无法播放
+- **问题**: RTSP流连接失败
+- **解决**: 确认RV1106设备RTSP服务正常运行
+
+---
 ## 🏗️ 框架设计
 
 ### 📊 MVC架构模式

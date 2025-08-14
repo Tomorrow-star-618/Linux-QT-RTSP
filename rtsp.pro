@@ -45,14 +45,14 @@ LIBS += -L/usr/lib/x86_64-linux-gnu
 # 链接 FFmpeg 的库
 LIBS += -lavcodec -lavformat -lavutil -lswscale
 
-# OpenCV 头文件路径
-INCLUDEPATH += /usr/include/opencv4
+## OpenCV 头文件路径
+#INCLUDEPATH += /usr/include/opencv4
 
-# OpenCV 库文件路径
-LIBS += -L/usr/lib/x86_64-linux-gnu
+## OpenCV 库文件路径
+#LIBS += -L/usr/lib/x86_64-linux-gnu
 
-# 链接 OpenCV 的常用库
-LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio
+## 链接 OpenCV 的常用库
+#LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio
 
 
 # Default rules for deployment.
