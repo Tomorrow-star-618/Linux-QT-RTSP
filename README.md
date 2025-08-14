@@ -19,9 +19,7 @@
 
 ## 🖥️ 主界面展示
 
-<div align="center">
-<img width="1300" height="679" alt="主界面展示" src="https://github.com/user-attachments/assets/fe58d10c-e5d2-42e9-bdc7-0fae05eb1a49" />
-</div>
+![主界面展示](readme-picture/main-interface.png)
 
 ---
 
@@ -346,7 +344,17 @@ rtsp/
 │   └── .gitignore            # Git忽略配置
 │
 └── 📖 文档
-    └── README.md             # 项目说明文档
+    ├── README.md             # 项目说明文档
+    └── readme-picture/       # 项目效果展示图片
+        ├── main-interface.png        # 主界面展示图
+        ├── ai-recognition.png        # AI智能识别效果图
+        ├── region-detection.png      # 区域限定识别效果图
+        ├── object-selection.png      # 物体选择界面图
+        ├── object-detection.png      # 特定物体识别效果图
+        ├── region-object-detection.png # 区域+物体组合识别图
+        ├── scheme-preselection.png   # 智能方案预选界面图
+        ├── album-system.png          # 相册管理系统界面图
+        └── tcp-communication.png     # TCP网络通信界面图
 ```
 
 ### 🔗 依赖关系图
@@ -387,6 +395,104 @@ controller (核心控制器)
 - 🏠 **安防系统**: 家庭/办公室安防监控
 - 🤖 **机器视觉**: 自动化生产线质量检测
 - 📊 **数据采集**: 视觉数据收集和分析
+
+---
+
+## 🎬 效果展示
+
+### 🤖 AI智能识别功能
+
+#### 🔍 全屏AI识别
+> 📋 **功能说明**: 默认全屏识别模式，检测画面中的所有目标对象
+
+<div align="center">
+<img src="readme-picture/ai-recognition.png" alt="全屏AI识别效果" width="800"/>
+</div>
+
+---
+
+#### 📐 区域限定识别
+> 🎯 **功能说明**: 只识别用户指定矩形框内的物体，过滤框外干扰信息
+
+<div align="center">
+<img src="readme-picture/region-detection.png" alt="区域识别效果" width="800"/>
+</div>
+
+---
+
+#### 🔖 特定物体识别
+> 🎛️ **功能说明**: 从COCO数据集80类中选择特定物体进行识别，支持单选和多选
+
+<div align="center">
+
+**物体选择界面**
+<img src="readme-picture/object-selection.png" alt="物体选择界面" width="600"/>
+
+**识别效果展示**
+<img src="readme-picture/object-detection.png" alt="特定物体识别效果" width="800"/>
+
+</div>
+
+---
+
+#### 🎯 区域+物体组合识别
+> 🔬 **功能说明**: 精确识别 - 仅在指定区域内检测指定类型的物体
+
+<div align="center">
+<img src="readme-picture/region-object-detection.png" alt="组合识别效果" width="800"/>
+</div>
+
+---
+
+### 🛠️ 系统管理功能
+
+#### 📋 智能方案预选
+> ⚡ **功能说明**: 一键导入预设配置，快速部署不同监控场景
+
+<div align="center">
+<img src="readme-picture/scheme-preselection.png" alt="方案预选界面" width="700"/>
+</div>
+
+---
+
+#### 📸 相册管理系统
+> 📂 **功能说明**: 分类管理截图和报警图片，支持缩放、排序、删除等操作
+
+<div align="center">
+<img src="readme-picture/album-system.png" alt="相册功能界面" width="700"/>
+</div>
+
+---
+
+#### 🌐 TCP网络通信
+> 📡 **功能说明**: 多客户端连接管理，实时数据传输和设备控制
+
+<div align="center">
+<img src="readme-picture/tcp-communication.png" alt="TCP服务界面" width="700"/>
+</div>
+
+---
+
+### ✨ 功能特色总结
+
+| 🎯 功能模块 | 🔧 核心特性 | 📊 应用场景 |
+|------------|------------|------------|
+| **🤖 AI识别** | YOLOv5实时检测 | 智能监控、目标跟踪 |
+| **📐 区域识别** | 自定义检测区域 | 禁区监控、区域安防 |
+| **🔖 物体识别** | 80类COCO对象 | 特定目标监测 |
+| **📋 方案预选** | 一键配置切换 | 多场景快速部署 |
+| **📸 相册管理** | 双相册系统 | 图片分类存储 |
+| **🌐 TCP通信** | 多客户端支持 | 设备集中控制 |
+
+> 💡 **提示**: 点击图片可查看更清晰的效果展示
+
+---
+
+### 📧 技术支持
+
+如有任何技术问题或建议，欢迎通过邮箱与我联系：
+
+📮 **联系邮箱**: [13883124164@163.com](mailto:13883124164@163.com)
 
 ---
 
