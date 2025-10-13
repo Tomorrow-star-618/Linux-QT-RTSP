@@ -76,7 +76,7 @@ public:
 
 signals:
     void tcpClientConnected(const QString& ip, quint16 port); // 新增：客户端连接成功信号
-    void detectionDataReceived(const QString& detectionData); // 新增：检测数据接收信号
+    void detectionDataReceived(int cameraId, const QString& detectionData); // 新增：检测数据接收信号（含摄像头ID）
 
 private slots:
     void clearTextBrowser();           // 清空文本显示
@@ -88,7 +88,7 @@ private slots:
 
 private:
     void getLocalHostIP();             // 获取本地所有IP
-    void processDetectionData(const QString& data); // 新增：处理检测数据
+    void processDetectionData(int cameraId, const QString& data); // 新增：处理检测数据（含摄像头ID）
     QTcpServer* tcpServer;             // TCP服务器对象
     QList<QTcpSocket*> clientSockets;  // 已连接的客户端socket列表
     QMap<QString, QTcpSocket*> ipToSocketMap;  // IP地址到Socket的映射

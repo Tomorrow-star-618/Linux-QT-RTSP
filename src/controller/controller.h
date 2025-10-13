@@ -42,7 +42,7 @@ private slots:
     // 处理用户确认的矩形框（归一化坐标和绝对坐标），便于后续处理如检测、标注等
     void onNormalizedRectangleConfirmed(const NormalizedRectangleBox& normRect, const RectangleBox& absRect);
     void onPlanApplied(const PlanData& plan); // 处理方案应用槽
-    void onDetectionDataReceived(const QString& detectionData); // 新增：处理检测数据接收槽
+    void onDetectionDataReceived(int cameraId, const QString& detectionData); // 新增：处理检测数据接收槽（含摄像头ID）
     
     // 多路视频流槽函数
     void onLayoutModeChanged(int mode);     // 布局模式切换
@@ -58,7 +58,7 @@ private:
     bool m_paused = false; //暂停标志
     QImage m_lastImage; // 保存最近一帧图像
     void saveImage();   // 截图保存函数
-    void saveAlarmImage(const QString& detectionInfo); // 新增：报警图像保存函数
+    void saveAlarmImage(int cameraId, const QString& detectionInfo); // 新增：报警图像保存函数（含摄像头ID）
     Tcpserver* tcpWin = nullptr; // TCP服务器窗口指针
     DetectList* m_detectList = nullptr; // 对象检测列表窗口指针
     Plan* m_plan = nullptr; // 方案预选窗口指针

@@ -58,6 +58,7 @@ public:
     int getStreamIdForCamera(int cameraId) const;               // 根据摄像头ID获取视频流ID
     void setStreamBoundIp(int streamId, const QString& ip);     // 设置视频流绑定的IP地址
     void setCameraBoundIp(int cameraId, const QString& ip);     // 设置摄像头绑定的IP地址（通过摄像头ID）
+    QImage getCurrentFrameForCamera(int cameraId);              // 获取指定摄像头的当前帧图像
 
 signals:
     void rectangleConfirmed(const RectangleBox& rect); // 矩形框确认信号
@@ -85,6 +86,7 @@ private:
     void initMultiStreamControl(); // 初始化多路视频流控制面板
     void initVideoContainer();     // 初始化多路视频容器
     void updateVideoLayout();      // 更新视频布局
+    QRect getActualImageRect(VideoLabel* label) const; // 计算VideoLabel中实际图像显示区域（去除黑边）
 
     QList<QPushButton*> tabButtons;  // 存储所有标签按钮的列表
     QList<QPushButton*> ServoButtons;// 存储舵机所有按钮的列表

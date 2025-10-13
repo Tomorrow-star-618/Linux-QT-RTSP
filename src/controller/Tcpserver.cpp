@@ -300,8 +300,9 @@ void Tcpserver::receiveMessages()
     }
     textBrowser->append(displayMessage);
     
-    // 检查是否为检测数据并进行处理
-    processDetectionData(message);
+    // 检查是否为检测数据并进行处理（传递摄像头ID）
+    int cameraId = ipToCameraMap.value(ip, -1); // 获取摄像头ID，未绑定则为-1
+    processDetectionData(cameraId, message);
 }
 
 void Tcpserver::lockip()
@@ -546,7 +547,8 @@ bool Tcpserver::hasConnectedClients() const
 }
 
 // 处理检测数据的函数，当接收到DETECTIONS格式的数据时触发图像保存
-void Tcpserver::processDetectionData(const QString& data)
+// 参数：cameraId - 发送数据的摄像头ID，-1表示未绑定
+void Tcpserver::processDetectionData(int cameraId, const QString& data)
 {
     // 去除首尾空白字符并检查数据是否以DETECTIONS开头
     QString trimmedData = data.trimmed();
@@ -599,8 +601,8 @@ void Tcpserver::processDetectionData(const QString& data)
     }
     
     
-    // 发射信号给controller，传递处理后的数据
-    emit detectionDataReceived(processedData);
+    // 发射信号给controller，传递摄像头ID和处理后的数据
+    emit detectionDataReceived(cameraId, processedData);
 }
 
 // ========== IP与摄像头ID映射管理函数 ==========

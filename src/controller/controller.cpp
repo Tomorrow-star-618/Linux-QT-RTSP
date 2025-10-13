@@ -141,31 +141,61 @@ void Controller::saveImage()
     }
 }
 
-void Controller::saveAlarmImage(const QString& detectionInfo)
+void Controller::saveAlarmImage(int cameraId, const QString& detectionInfo)
 {
-    if (m_lastImage.isNull()) {
-        qDebug() << "警告：当前没有可保存的图像！";
-        m_view->addEventMessage("warning", "检测到目标但当前没有可保存的图像！");
-        return;
+    // 根据摄像头ID获取对应的流图像
+    QImage imageToSave;
+    
+    if (cameraId > 0) {
+        // 尝试从View的VideoLabel直接获取该摄像头的当前图像
+        imageToSave = m_view->getCurrentFrameForCamera(cameraId);
+        if (!imageToSave.isNull()) {
+            qDebug() << "成功获取摄像头" << cameraId << "的当前帧图像";
+        } else {
+            qDebug() << "警告：无法获取摄像头" << cameraId << "的图像";
+        }
+    }
+    
+    // 如果未指定摄像头或获取失败，使用主流图像（m_lastImage）作为备用
+    if (imageToSave.isNull()) {
+        if (!m_lastImage.isNull()) {
+            imageToSave = m_lastImage;
+            cameraId = 0; // 标记为主流
+            qDebug() << "警告：无法获取摄像头" << cameraId << "的图像，使用主流图像";
+        } else {
+            qDebug() << "错误：当前没有可保存的图像！";
+            m_view->addEventMessage("warning", "检测到目标但当前没有可保存的图像！");
+            return;
+        }
     }
     
     // 确保报警图片目录存在（使用项目根目录路径）
     // __FILE__ 在 src/controller/controller.cpp，需要回退到项目根目录
-    QString sourcePath = QString(__FILE__).section('/', 0, -3); // 回退到项目根目录
+    QString sourcePath = QString(__FILE__).section('/', 0, -4); // 回退到项目根目录
     QDir dir(sourcePath + "/picture/alarm-picture");
     if (!dir.exists()) {
         dir.mkpath("."); // 创建目录
     }
     
-    // 生成报警图片文件名，包含时间戳和检测信息
+    // 生成报警图片文件名，格式：alarm_cam{摄像头ID}_{时间精确到秒}_{毫秒}.jpg
+    // 例如：alarm_cam1_20251013_155943_515.jpg
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
-    QString fileName = dir.filePath(QString("ALARM_%1.jpg").arg(timestamp));
+    QString fileName;
+    if (cameraId > 0) {
+        fileName = dir.filePath(QString("alarm_cam%1_%2.jpg").arg(cameraId).arg(timestamp));
+    } else {
+        // cameraId为0或-1时，使用main作为标识
+        fileName = dir.filePath(QString("alarm_main_%1.jpg").arg(timestamp));
+    }
     
     // 保存图像
-    if (m_lastImage.save(fileName)) {
-        QString successMsg = QString("检测到目标，报警图片已保存: %1").arg(fileName);
+    if (imageToSave.save(fileName)) {
+        QString successMsg = QString("摄像头%1检测到目标，报警图片已保存: %2").arg(cameraId).arg(fileName);
         qDebug() << successMsg;
         m_view->addEventMessage("alarm", successMsg);
+    } else {
+        qDebug() << "错误：报警图片保存失败！";
+        m_view->addEventMessage("error", "报警图片保存失败！");
     }
 }
 
@@ -962,15 +992,19 @@ void Controller::onPlanApplied(const PlanData& plan)
     m_view->addEventMessage("success", QString("方案 \"%1\" 应用成功！").arg(plan.name));
 }
 
-void Controller::onDetectionDataReceived(const QString& detectionData)
+void Controller::onDetectionDataReceived(int cameraId, const QString& detectionData)
 {
-    qDebug() << "Controller接收到检测数据:" << detectionData;
+    qDebug() << "Controller接收到检测数据 [摄像头ID:" << cameraId << "]:" << detectionData;
     
-    // 记录检测事件到消息系统（直接显示处理后的数据）
-    m_view->addEventMessage("info", QString("🎯 检测到目标: %1").arg(detectionData));
+    // 记录检测事件到消息系统（包含摄像头信息）
+    if (cameraId > 0) {
+        m_view->addEventMessage("info", QString("🎯 摄像头%1检测到目标: %2").arg(cameraId).arg(detectionData));
+    } else {
+        m_view->addEventMessage("info", QString("🎯 检测到目标: %1 (未绑定摄像头)").arg(detectionData));
+    }
     
-    // 调用报警图像保存函数
-    saveAlarmImage(detectionData);
+    // 调用报警图像保存函数，传入摄像头ID
+    saveAlarmImage(cameraId, detectionData);
 }
 
 // ============================================
@@ -1172,12 +1206,12 @@ void Controller::onStreamScreenshotRequested(int streamId)
         dir.mkpath(".");
     }
     
-    // 生成文件名：时间戳_摄像头ID_摄像头名称.jpg
+    // 生成文件名：save_cam{摄像头ID}_{时间精确到秒}_{毫秒}.jpg
+    // 格式：save_cam1_20251013_155943_515.jpg
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
-    QString filename = QString("%1_%2_%3.jpg")
-                        .arg(timestamp)
+    QString filename = QString("save_cam%1_%2.jpg")
                         .arg(cameraId)
-                        .arg(cameraName.replace(" ", "_")); // 替换空格为下划线
+                        .arg(timestamp);
     QString filepath = dir.filePath(filename);
     
     // 保存图像

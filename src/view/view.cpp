@@ -493,6 +493,32 @@ void View::onRectangleDrawn(const RectangleBox& rect)
     qDebug() << "View接收到矩形框绘制完成信号:" << rect.x << rect.y << rect.width << rect.height;
 }
 
+// 辅助函数：计算VideoLabel中实际图像显示区域（去除黑边）
+QRect View::getActualImageRect(VideoLabel* label) const
+{
+    if (!label || !label->pixmap()) {
+        return QRect();
+    }
+    
+    // 获取标签尺寸和图像尺寸
+    QSize labelSize = label->size();
+    QSize pixmapSize = label->pixmap()->size();
+    
+    if (pixmapSize.isEmpty() || labelSize.isEmpty()) {
+        return QRect();
+    }
+    
+    // 计算缩放后的图像尺寸（保持纵横比）
+    QSize scaledSize = pixmapSize.scaled(labelSize, Qt::KeepAspectRatio);
+    
+    // 计算图像在标签中的偏移（居中显示）
+    int offsetX = (labelSize.width() - scaledSize.width()) / 2;
+    int offsetY = (labelSize.height() - scaledSize.height()) / 2;
+    
+    // 返回实际图像显示区域
+    return QRect(offsetX, offsetY, scaledSize.width(), scaledSize.height());
+}
+
 // 槽函数：接收确认的矩形框信号，保存并发出rectangleConfirmed信号通知Controller
 void View::onRectangleConfirmed(const RectangleBox& rect)
 {
@@ -500,34 +526,50 @@ void View::onRectangleConfirmed(const RectangleBox& rect)
     m_hasRectangle = true;
     qDebug() << "View接收到矩形框确认信号:" << rect.x << rect.y << rect.width << rect.height;
     
-    // 归一化处理 - 根据当前显示的VideoLabel获取尺寸
-    int labelW = 0, labelH = 0;
+    // 获取当前使用的VideoLabel
+    VideoLabel* currentLabel = nullptr;
     
-    // 如果当前是全屏模式，从全屏VideoLabel获取尺寸
+    // 如果当前是全屏模式，使用全屏VideoLabel
     if (m_fullScreenStreamId != -1 && videoLabels.contains(m_fullScreenStreamId)) {
-        VideoLabel* fullscreenLabel = videoLabels.value(m_fullScreenStreamId);
-        if (fullscreenLabel) {
-            labelW = fullscreenLabel->width();
-            labelH = fullscreenLabel->height();
-            qDebug() << "从全屏VideoLabel获取尺寸:" << labelW << "x" << labelH;
-        }
+        currentLabel = videoLabels.value(m_fullScreenStreamId);
     }
-    // 否则从老的videoLabel获取尺寸（兼容旧代码）
+    // 否则使用老的videoLabel（兼容旧代码）
     else if (videoLabel) {
-        labelW = videoLabel->width();
-        labelH = videoLabel->height();
-        qDebug() << "从videoLabel获取尺寸:" << labelW << "x" << labelH;
+        currentLabel = videoLabel;
     }
     
     // 执行归一化
     NormalizedRectangleBox normRect;
-    if (labelW > 0 && labelH > 0) {
-        normRect.x = static_cast<float>(rect.x) / labelW;
-        normRect.y = static_cast<float>(rect.y) / labelH;
-        normRect.width = static_cast<float>(rect.width) / labelW;
-        normRect.height = static_cast<float>(rect.height) / labelH;
+    
+    if (currentLabel) {
+        // 获取实际图像显示区域（去除黑边）
+        QRect imageRect = getActualImageRect(currentLabel);
+        
+        if (!imageRect.isEmpty()) {
+            // 将矩形框坐标转换为相对于实际图像的坐标（去除黑边偏移）
+            int relX = rect.x - imageRect.x();
+            int relY = rect.y - imageRect.y();
+            int relWidth = rect.width;
+            int relHeight = rect.height;
+            
+            // 基于实际图像尺寸进行归一化
+            normRect.x = static_cast<float>(relX) / imageRect.width();
+            normRect.y = static_cast<float>(relY) / imageRect.height();
+            normRect.width = static_cast<float>(relWidth) / imageRect.width();
+            normRect.height = static_cast<float>(relHeight) / imageRect.height();
+            
+            qDebug() << "实际图像区域:" << imageRect;
+            qDebug() << "相对图像坐标:" << relX << relY << relWidth << relHeight;
+            qDebug() << "归一化坐标:" << normRect.x << normRect.y << normRect.width << normRect.height;
+        } else {
+            qWarning() << "无法获取实际图像显示区域";
+            normRect.x = 0;
+            normRect.y = 0;
+            normRect.width = 0;
+            normRect.height = 0;
+        }
     } else {
-        qWarning() << "无法获取VideoLabel尺寸，归一化失败";
+        qWarning() << "无法获取VideoLabel，归一化失败";
         normRect.x = 0;
         normRect.y = 0;
         normRect.width = 0;
@@ -1191,7 +1233,7 @@ void View::updateVideoLayout()
     
     // 设置行和列的拉伸因子，让网格均匀分布
     // 先清除旧的拉伸因子
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; i++) {
         videoGridLayout->setRowStretch(i, 0);
         videoGridLayout->setColumnStretch(i, 0);
     }
@@ -1471,6 +1513,31 @@ void View::setCameraBoundIp(int cameraId, const QString& ip)
     } else {
         qDebug() << "警告：摄像头" << cameraId << "没有对应的视频流";
     }
+}
+
+// 获取指定摄像头的当前帧图像
+QImage View::getCurrentFrameForCamera(int cameraId)
+{
+    // 查找该摄像头ID对应的流ID
+    int streamId = getStreamIdForCamera(cameraId);
+    if (streamId == -1) {
+        qDebug() << "警告：摄像头" << cameraId << "没有对应的视频流";
+        return QImage();
+    }
+    
+    // 获取该流的VideoLabel
+    VideoLabel* label = getVideoLabelForStream(streamId);
+    if (!label || label->pixmap() == nullptr) {
+        qDebug() << "警告：摄像头" << cameraId << "的VideoLabel没有图像";
+        return QImage();
+    }
+    
+    // 从QPixmap转换为QImage
+    QPixmap pixmap = *label->pixmap();
+    QImage image = pixmap.toImage();
+    
+    qDebug() << "获取摄像头" << cameraId << "的当前帧图像，尺寸:" << image.size();
+    return image;
 }
 
 

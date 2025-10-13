@@ -46,6 +46,7 @@ Picture::Picture(QWidget* parent)
     jumpEdit = new QLineEdit(this);
     jumpBtn = new QPushButton("跳转", this);
     sortComboBox = new QComboBox(this);
+    cameraFilterComboBox = new QComboBox(this);
     infoLabel = new QLabel("0/0", this);
     timeLabel = new QLabel("", this);
     
@@ -63,34 +64,34 @@ Picture::Picture(QWidget* parent)
     sortComboBox->addItem("时间升序");
     sortComboBox->setCurrentIndex(0);
     
-    // 设置排序下拉框样式（浅蓝色背景）
+    // 设置排序下拉框样式（蓝色主题）
     sortComboBox->setStyleSheet(
         "QComboBox {"
         "  background-color: #e3f2fd;"
-        "  border: 2px solid #64b5f6;"
+        "  border: 2px solid #2196f3;"
         "  border-radius: 8px;"
         "  padding: 6px 12px;"
         "  font-size: 12px;"
         "  font-weight: bold;"
-        "  color: #1565c0;"
+        "  color: #0d47a1;"
         "  min-width: 80px;"
         "}"
         "QComboBox:hover {"
         "  background-color: #bbdefb;"
-        "  border-color: #42a5f5;"
+        "  border-color: #1976d2;"
         "}"
         "QComboBox:focus {"
         "  background-color: #90caf9;"
-        "  border-color: #2196f3;"
+        "  border-color: #1565c0;"
         "}"
         "QComboBox::drop-down {"
         "  subcontrol-origin: padding;"
         "  subcontrol-position: top right;"
         "  width: 20px;"
-        "  border-left: 1px solid #64b5f6;"
+        "  border-left: 1px solid #2196f3;"
         "  border-top-right-radius: 8px;"
         "  border-bottom-right-radius: 8px;"
-        "  background-color: #64b5f6;"
+        "  background-color: #2196f3;"
         "}"
         "QComboBox::down-arrow {"
         "  image: none;"
@@ -101,9 +102,9 @@ Picture::Picture(QWidget* parent)
         "}"
         "QComboBox QAbstractItemView {"
         "  background-color: #e3f2fd;"
-        "  border: 2px solid #64b5f6;"
+        "  border: 2px solid #2196f3;"
         "  border-radius: 6px;"
-        "  color: #1565c0;"
+        "  color: #0d47a1;"
         "  selection-background-color: #90caf9;"
         "  selection-color: #0d47a1;"
         "  padding: 4px;"
@@ -114,6 +115,64 @@ Picture::Picture(QWidget* parent)
         "}"
         "QComboBox QAbstractItemView::item:hover {"
         "  background-color: #bbdefb;"
+        "}"
+    );
+    
+    // 设置摄像头筛选下拉框
+    cameraFilterComboBox->addItem("所有摄像头");
+    cameraFilterComboBox->addItem("摄像头 1");
+    cameraFilterComboBox->addItem("摄像头 2");
+    cameraFilterComboBox->setCurrentIndex(0);
+    cameraFilterComboBox->setStyleSheet(
+        "QComboBox {"
+        "  background-color: #d4edda;"
+        "  border: 2px solid #28a745;"
+        "  border-radius: 8px;"
+        "  padding: 6px 12px;"
+        "  font-size: 12px;"
+        "  font-weight: bold;"
+        "  color: #155724;"
+        "  min-width: 100px;"
+        "}"
+        "QComboBox:hover {"
+        "  background-color: #c3e6cb;"
+        "  border-color: #1e7e34;"
+        "}"
+        "QComboBox:focus {"
+        "  background-color: #b1dfbb;"
+        "  border-color: #1e7e34;"
+        "}"
+        "QComboBox::drop-down {"
+        "  subcontrol-origin: padding;"
+        "  subcontrol-position: top right;"
+        "  width: 20px;"
+        "  border-left: 1px solid #28a745;"
+        "  border-top-right-radius: 8px;"
+        "  border-bottom-right-radius: 8px;"
+        "  background-color: #28a745;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  image: none;"
+        "  border-left: 5px solid transparent;"
+        "  border-right: 5px solid transparent;"
+        "  border-top: 8px solid white;"
+        "  margin-top: 2px;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "  background-color: #d4edda;"
+        "  border: 2px solid #28a745;"
+        "  border-radius: 6px;"
+        "  color: #155724;"
+        "  selection-background-color: #b1dfbb;"
+        "  selection-color: #155724;"
+        "  padding: 4px;"
+        "}"
+        "QComboBox QAbstractItemView::item {"
+        "  padding: 6px 12px;"
+        "  border-radius: 4px;"
+        "}"
+        "QComboBox QAbstractItemView::item:hover {"
+        "  background-color: #c3e6cb;"
         "}"
     );
     
@@ -373,8 +432,10 @@ Picture::Picture(QWidget* parent)
     jumpLayout->addWidget(jumpBtn);
     bottomControlLayout->addLayout(jumpLayout);
     
-    // 右侧：排序控件
+    // 右侧：摄像头筛选和排序控件
     bottomControlLayout->addStretch();
+    bottomControlLayout->addWidget(new QLabel("摄像头:"));
+    bottomControlLayout->addWidget(cameraFilterComboBox);
     bottomControlLayout->addWidget(new QLabel("排序:"));
     bottomControlLayout->addWidget(sortComboBox);
 
@@ -399,6 +460,7 @@ Picture::Picture(QWidget* parent)
     connect(jumpBtn, &QPushButton::clicked, this, &Picture::onJumpToImage);
     connect(jumpEdit, &QLineEdit::returnPressed, this, &Picture::onJumpToImage);
     connect(sortComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Picture::onSortOrderChanged);
+    connect(cameraFilterComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Picture::onCameraFilterChanged);
 
     // 加载图片
     loadImages();
@@ -409,9 +471,11 @@ Picture::~Picture() {}
 
 void Picture::loadImages()
 {
+    allImageFiles.clear();
     imageFiles.clear();
+    
     // 确保picture文件夹存在（使用源码路径）
-    QString sourcePath = QString(__FILE__).section('/', 0, -2); // 获取源码目录路径
+    QString sourcePath = QString(__FILE__).section('/', 0, -4); // 获取源码目录路径
     QString albumPath;
     
     if (isScreenshotAlbum) {
@@ -430,7 +494,24 @@ void Picture::loadImages()
     filters << "*.jpg" << "*.png" << "*.jpeg" << "*.bmp";
     QFileInfoList fileList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     for (const QFileInfo& fileInfo : fileList) {
-        imageFiles << fileInfo.absoluteFilePath();
+        allImageFiles << fileInfo.absoluteFilePath();
+    }
+    
+    // 更新摄像头筛选下拉框
+    updateCameraFilter();
+    
+    // 根据筛选条件过滤图片
+    if (currentCameraFilter == -1) {
+        // 显示所有摄像头的图片
+        imageFiles = allImageFiles;
+    } else {
+        // 只显示指定摄像头的图片
+        for (const QString& filePath : allImageFiles) {
+            int cameraId = extractCameraIdFromFilename(filePath);
+            if (cameraId == currentCameraFilter) {
+                imageFiles << filePath;
+            }
+        }
     }
     
     // 对图片进行排序
@@ -542,6 +623,10 @@ void Picture::onScreenshotAlbumClicked()
             "}"
         );
         
+        // 重置摄像头筛选为"全部摄像头"
+        currentCameraFilter = -1;
+        cameraFilterComboBox->setCurrentIndex(0);
+        
         // 重新加载截图相册的图片
         loadImages();
         updateImage();
@@ -589,6 +674,10 @@ void Picture::onAlarmAlbumClicked()
             "  border-color: #1e7e34;"
             "}"
         );
+        
+        // 重置摄像头筛选为"全部摄像头"
+        currentCameraFilter = -1;
+        cameraFilterComboBox->setCurrentIndex(0);
         
         // 重新加载报警相册的图片
         loadImages();
@@ -727,14 +816,39 @@ QString Picture::extractTimeFromFilename(const QString& filename)
     QFileInfo fileInfo(filename);
     QString baseName = fileInfo.baseName();
     
-    // 尝试从文件名中提取时间戳
-    // 假设文件名格式为：screenshot_20240101_123456.jpg 或 alarm_20240101_123456.jpg
-    QRegularExpression timeRegex(R"((\d{8}_\d{6}))");
+    // 新格式：save_cam1_20251013_155943_515.jpg 或 alarm_cam1_20251013_155943_515.jpg
+    // 提取时间戳部分：20251013_155943_515 (日期_时间_毫秒)
+    QRegularExpression timeRegex(R"((\d{8}_\d{6}_\d{3}))");
     QRegularExpressionMatch match = timeRegex.match(baseName);
     
     if (match.hasMatch()) {
         QString timeStr = match.captured(1);
-        // 转换为更易读的格式：20240101_123456 -> 2024-01-01 12:34:56
+        // 分割：20251013_155943_515 -> 日期 + 时间 + 毫秒
+        QStringList parts = timeStr.split("_");
+        if (parts.size() == 3) {
+            QString date = parts[0];  // 20251013
+            QString time = parts[1];  // 155943
+            QString ms = parts[2];    // 515
+            
+            QString formattedDate = QString("%1-%2-%3")
+                .arg(date.left(4))     // 年
+                .arg(date.mid(4, 2))   // 月
+                .arg(date.right(2));   // 日
+            QString formattedTime = QString("%1:%2:%3.%4")
+                .arg(time.left(2))     // 时
+                .arg(time.mid(2, 2))   // 分
+                .arg(time.right(2))    // 秒
+                .arg(ms);              // 毫秒
+            return formattedDate + " " + formattedTime;
+        }
+    }
+    
+    // 兼容旧格式：20240101_123456（不带毫秒）
+    QRegularExpression oldTimeRegex(R"((\d{8}_\d{6}))");
+    QRegularExpressionMatch oldMatch = oldTimeRegex.match(baseName);
+    
+    if (oldMatch.hasMatch()) {
+        QString timeStr = oldMatch.captured(1);
         if (timeStr.length() == 15) { // 8位日期 + 1位下划线 + 6位时间
             QString date = timeStr.left(8);
             QString time = timeStr.right(6);
@@ -753,4 +867,133 @@ QString Picture::extractTimeFromFilename(const QString& filename)
     // 如果无法从文件名提取时间，使用文件修改时间
     QDateTime modifyTime = fileInfo.lastModified();
     return modifyTime.toString("yyyy-MM-dd hh:mm:ss");
+}
+
+// 从文件名中提取摄像头ID
+int Picture::extractCameraIdFromFilename(const QString& filename)
+{
+    QFileInfo fileInfo(filename);
+    QString baseName = fileInfo.baseName();
+    
+    // 统一文件名格式：
+    // 截图：save_cam{id}_{时间}_{序号}.jpg  例如：save_cam1_20251013_155943_515.jpg
+    // 报警：alarm_cam{id}_{时间}_{序号}.jpg 例如：alarm_cam1_20251013_155943_515.jpg
+    // 主流：save_main_{时间}_{序号}.jpg 或 alarm_main_{时间}_{序号}.jpg
+    
+    // 匹配格式：save_cam{数字} 或 alarm_cam{数字}
+    QRegularExpression pattern(R"(^(?:save|alarm)_cam(\d+)_)");
+    QRegularExpressionMatch match = pattern.match(baseName);
+    if (match.hasMatch()) {
+        return match.captured(1).toInt();
+    }
+    
+    // 匹配主流格式：save_main 或 alarm_main
+    if (baseName.startsWith("save_main_") || baseName.startsWith("alarm_main_")) {
+        return 0; // 0表示主流
+    }
+    
+    // 兼容旧格式（如果有）
+    // 格式1: 时间戳_摄像头ID_摄像头名称
+    QRegularExpression oldPattern1(R"(_(\d+)_[^_]+$)");
+    QRegularExpressionMatch oldMatch1 = oldPattern1.match(baseName);
+    if (oldMatch1.hasMatch()) {
+        return oldMatch1.captured(1).toInt();
+    }
+    
+    // 格式2: ALARM_时间戳_CAM{摄像头ID}
+    QRegularExpression oldPattern2(R"(_CAM(\d+)$)");
+    QRegularExpressionMatch oldMatch2 = oldPattern2.match(baseName);
+    if (oldMatch2.hasMatch()) {
+        return oldMatch2.captured(1).toInt();
+    }
+    
+    // 无法识别摄像头ID
+    return -1;
+}
+
+// 更新摄像头筛选下拉框
+void Picture::updateCameraFilter()
+{
+    // 保存当前选中项
+    int currentSelection = cameraFilterComboBox->currentIndex();
+    
+    // 清空下拉框
+    cameraFilterComboBox->clear();
+    cameraFilterComboBox->addItem("全部摄像头");
+    
+    // 收集所有摄像头ID
+    QSet<int> cameraIds;
+    for (const QString& filePath : allImageFiles) {
+        int cameraId = extractCameraIdFromFilename(filePath);
+        if (cameraId >= 0) { // 0表示主流，也添加到列表
+            cameraIds.insert(cameraId);
+        }
+    }
+    
+    // 转换为列表并排序
+    QList<int> sortedIds = cameraIds.values();
+    std::sort(sortedIds.begin(), sortedIds.end());
+    
+    // 添加到下拉框
+    for (int cameraId : sortedIds) {
+        if (cameraId == 0) {
+            cameraFilterComboBox->addItem("主流");
+        } else {
+            cameraFilterComboBox->addItem(QString("摄像头 %1").arg(cameraId));
+        }
+    }
+    
+    // 恢复之前的选中项（如果可能）
+    if (currentSelection >= 0 && currentSelection < cameraFilterComboBox->count()) {
+        cameraFilterComboBox->setCurrentIndex(currentSelection);
+    } else {
+        cameraFilterComboBox->setCurrentIndex(0); // 默认选中"全部摄像头"
+    }
+}
+
+// 处理摄像头筛选改变
+void Picture::onCameraFilterChanged(int index)
+{
+    if (index == 0) {
+        // 选中"全部摄像头"
+        currentCameraFilter = -1;
+    } else {
+        // 选中具体摄像头
+        QString text = cameraFilterComboBox->currentText();
+        if (text == "主流") {
+            currentCameraFilter = 0;
+        } else {
+            // 从"摄像头 X"中提取ID
+            QRegularExpression regex(R"(\d+)");
+            QRegularExpressionMatch match = regex.match(text);
+            if (match.hasMatch()) {
+                currentCameraFilter = match.captured(0).toInt();
+            } else {
+                currentCameraFilter = -1;
+            }
+        }
+    }
+    
+    // 重新加载并筛选图片
+    imageFiles.clear();
+    
+    if (currentCameraFilter == -1) {
+        // 显示所有摄像头的图片
+        imageFiles = allImageFiles;
+    } else {
+        // 只显示指定摄像头的图片
+        for (const QString& filePath : allImageFiles) {
+            int cameraId = extractCameraIdFromFilename(filePath);
+            if (cameraId == currentCameraFilter) {
+                imageFiles << filePath;
+            }
+        }
+    }
+    
+    // 重新排序
+    sortImages();
+    
+    // 重置到第一张
+    currentIndex = 0;
+    updateImage();
 }
