@@ -20,6 +20,7 @@ public:
     void stopStream();                         // 停止视频流线程
     void pauseStream();                        // 暂停视频流
     void resumeStream();                       // 恢复视频流
+    bool isPaused() const { return m_pause; }  // 获取暂停状态
 
 signals:
     void frameReady(const QImage& img);        // 视频帧准备好时发出信号，传递QImage

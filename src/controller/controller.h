@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include <QMap>
 #include "model.h"
 #include "view.h"
 #include "Picture.h"
@@ -20,6 +21,11 @@ public:
     
     // 设置TCP服务器指针
     void setTcpServer(Tcpserver* tcpServer);
+    
+    // 多路视频流管理
+    void addVideoStream(const QString& url, const QString& name, int cameraId);
+    void removeVideoStream(int streamId);
+    void clearAllStreams();
 
 public slots:
     void ButtonClickedHandler();      //主界面标签按键槽
@@ -37,6 +43,14 @@ private slots:
     void onNormalizedRectangleConfirmed(const NormalizedRectangleBox& normRect, const RectangleBox& absRect);
     void onPlanApplied(const PlanData& plan); // 处理方案应用槽
     void onDetectionDataReceived(const QString& detectionData); // 新增：处理检测数据接收槽
+    
+    // 多路视频流槽函数
+    void onLayoutModeChanged(int mode);     // 布局模式切换
+    void onStreamSelected(int streamId);    // 视频流选择
+    void onModelFrameReady(int streamId, const QImage& frame); // 多路视频帧更新
+    void onStreamPauseRequested(int streamId);     // 暂停视频流
+    void onStreamScreenshotRequested(int streamId); // 截图视频流
+    void onAddCameraWithIdRequested(int cameraId); // 添加指定ID的摄像头
 
 private:
     Model* m_model; //模型指针  
@@ -52,4 +66,8 @@ private:
     
     // 功能按钮状态管理
     void updateButtonDependencies(int clickedButtonId, bool isChecked);
+    
+    // 多路视频流管理
+    QMap<int, Model*> m_streamModels;  // streamId -> Model映射
+    int m_nextStreamId;                // 下一个可用的流ID
 };

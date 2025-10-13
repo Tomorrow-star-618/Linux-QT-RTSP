@@ -46,13 +46,30 @@ public:
     explicit Tcpserver(QWidget* parent = nullptr);
     ~Tcpserver();
 
-    void Tcp_sent_info(int deviceId, int operationId, int operationValue);  // 发送设备操作信息
-    void Tcp_sent_rect(int x, int y, int width, int height);    // 发送矩形框信息  
-    void Tcp_sent_rect(float x, float y, float width, float height);
-    void Tcp_sent_list(const QSet<int>& objectIds); // 发送目标ID列表
+    // TCP传输函数 - 参数1: 目标摄像头ID（0表示广播）
+    void Tcp_sent_info(int targetCameraId, int deviceId, int operationId, int operationValue);  // 发送设备操作信息
+    void Tcp_sent_rect(int targetCameraId, int x, int y, int width, int height);    // 发送矩形框信息（绝对坐标）
+    void Tcp_sent_rect(int targetCameraId, float x, float y, float width, float height); // 发送矩形框信息（归一化）
+    void Tcp_sent_list(int targetCameraId, const QSet<int>& objectIds); // 发送目标ID列表
+    
+    // 重载版本 - 使用IP地址作为目标
+    void Tcp_sent_info(const QString& targetIp, int deviceId, int operationId, int operationValue);
+    void Tcp_sent_rect(const QString& targetIp, int x, int y, int width, int height);
+    void Tcp_sent_rect(const QString& targetIp, float x, float y, float width, float height);
+    void Tcp_sent_list(const QString& targetIp, const QSet<int>& objectIds);
     void startListen();                // 开始监听
     void stopListen();                 // 停止监听
     bool hasConnectedClients() const;  // 判断是否有已连接客户端
+    
+    // IP与摄像头ID映射管理
+    void bindIpToCamera(const QString& ip, int cameraId);     // 绑定IP地址到摄像头ID
+    void unbindIpFromCamera(const QString& ip);               // 解绑IP地址
+    QString getIpForCamera(int cameraId) const;               // 获取摄像头对应的IP地址
+    int getCameraForIp(const QString& ip) const;              // 获取IP对应的摄像头ID
+    QMap<QString, int> getIpCameraMap() const;                // 获取IP到摄像头的映射表
+    void setCurrentCameraId(int cameraId);                    // 设置当前选中的摄像头ID
+    int getCurrentCameraId() const;                           // 获取当前选中的摄像头ID
+    QStringList getConnectedIps() const;                      // 获取所有已连接的IP地址列表
 
     // 公有成员：文本显示区（为了让Controller能够访问）
     QTextBrowser* textBrowser;         // 文本显示区
@@ -74,6 +91,10 @@ private:
     void processDetectionData(const QString& data); // 新增：处理检测数据
     QTcpServer* tcpServer;             // TCP服务器对象
     QList<QTcpSocket*> clientSockets;  // 已连接的客户端socket列表
+    QMap<QString, QTcpSocket*> ipToSocketMap;  // IP地址到Socket的映射
+    QMap<QString, int> ipToCameraMap;  // IP地址到摄像头ID的映射
+    QMap<int, QString> cameraToIpMap;  // 摄像头ID到IP地址的映射
+    int m_currentCameraId;             // 当前选中的摄像头ID
     QPushButton* pushButton[5];        // 按钮数组
     QLabel* label[2];                  // 标签数组
     QLineEdit* Ip_lineEdit;            // IP输入框

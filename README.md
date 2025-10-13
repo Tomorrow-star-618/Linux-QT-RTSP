@@ -309,22 +309,30 @@ TCP数据 → 协议解析 → 业务处理 → 设备控制
 ## 📁 项目结构
 ```
 rtsp/
-├── 📦 核心架构文件
-│   ├── main.cpp                # 程序入口
-│   ├── controller.cpp/h        # MVC主控制器
-│   ├── model.cpp/h            # 视频流数据模型
-│   ├── view.cpp/h             # 视图基类
-│   └── common.h               # 公共头文件和宏定义
+├── � src/                      # 源代码目录（MVC架构）
+│   ├── main.cpp                 # 程序入口
+│   │
+│   ├── 📂 model/                # Model层 - 数据模型
+│   │   ├── model.cpp/h          # 视频流数据处理模型
+│   │   └── common.h             # 公共头文件和宏定义
+│   │
+│   ├── � view/                 # View层 - 视图界面
+│   │   ├── mainwindow.cpp/h/ui  # 主窗口界面
+│   │   ├── Picture.cpp/h        # 相册浏览组件
+│   │   ├── VideoLabel.cpp/h     # 自定义视频显示控件
+│   │   ├── detectlist.cpp/h     # 对象选择列表组件
+│   │   ├── plan.cpp/h           # 方案预选管理界面
+│   │   └── view.cpp/h           # 视图基类
+│   │
+│   └── 📂 controller/           # Controller层 - 控制器
+│       ├── controller.cpp/h     # MVC主控制器
+│       └── Tcpserver.cpp/h      # TCP服务器控制器
 │
-├── 🖼️ 界面组件
-│   ├── mainwindow.cpp/h/ui    # 主窗口界面
-│   ├── Picture.cpp/h          # 相册浏览组件
-│   ├── VideoLabel.cpp/h       # 自定义视频显示控件
-│   ├── detectlist.cpp/h       # 对象选择列表组件
-│   └── plan.cpp/h             # 方案预选管理界面
-│
-├── 🌐 网络通信
-│   └── Tcpserver.cpp/h        # TCP服务器实现
+├── 📂 build/                    # 编译输出目录（自动生成）
+│   ├── obj/                     # 目标文件
+│   ├── moc/                     # MOC生成文件
+│   ├── rcc/                     # 资源编译文件
+│   └── ui/                      # UI文件生成
 │
 ├── 🎨 资源文件
 │   ├── icon.qrc              # 图标资源文件

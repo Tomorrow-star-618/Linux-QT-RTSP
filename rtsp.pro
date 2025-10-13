@@ -9,32 +9,56 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # 解决FFmpeg与标准库冲突的关键宏定义
 DEFINES += __STDC_CONSTANT_MACROS __STDC_FORMAT_MACROS
 
+# ============================================
+# 源代码目录定义
+# ============================================
+SOURCES_DIR = $$PWD/src
+MODEL_DIR = $$SOURCES_DIR/model
+VIEW_DIR = $$SOURCES_DIR/view
+CONTROLLER_DIR = $$SOURCES_DIR/controller
+
+# 头文件搜索路径 - 添加各层目录到包含路径
+INCLUDEPATH += $$MODEL_DIR \
+               $$VIEW_DIR \
+               $$CONTROLLER_DIR
+
+# ============================================
+# 源文件配置
+# ============================================
 SOURCES += \
-    Picture.cpp \
-    Tcpserver.cpp \
-    VideoLabel.cpp \
-    detectlist.cpp \
-    main.cpp \
-    mainwindow.cpp \
-    model.cpp \
-    view.cpp \
-    controller.cpp \
-    plan.cpp
+    $$SOURCES_DIR/main.cpp \
+    $$MODEL_DIR/model.cpp \
+    $$VIEW_DIR/mainwindow.cpp \
+    $$VIEW_DIR/Picture.cpp \
+    $$VIEW_DIR/VideoLabel.cpp \
+    $$VIEW_DIR/detectlist.cpp \
+    $$VIEW_DIR/plan.cpp \
+    $$VIEW_DIR/view.cpp \
+    $$VIEW_DIR/AddCameraDialog.cpp \
+    $$CONTROLLER_DIR/controller.cpp \
+    $$CONTROLLER_DIR/Tcpserver.cpp
 
+# ============================================
+# 头文件配置
+# ============================================
 HEADERS += \
-    Picture.h \
-    Tcpserver.h \
-    VideoLabel.h \
-    common.h \
-    detectlist.h \
-    mainwindow.h \
-    model.h \
-    view.h \
-    controller.h \
-    plan.h
+    $$MODEL_DIR/model.h \
+    $$MODEL_DIR/common.h \
+    $$VIEW_DIR/mainwindow.h \
+    $$VIEW_DIR/Picture.h \
+    $$VIEW_DIR/VideoLabel.h \
+    $$VIEW_DIR/detectlist.h \
+    $$VIEW_DIR/plan.h \
+    $$VIEW_DIR/view.h \
+    $$VIEW_DIR/AddCameraDialog.h \
+    $$CONTROLLER_DIR/controller.h \
+    $$CONTROLLER_DIR/Tcpserver.h
 
+# ============================================
+# UI文件配置
+# ============================================
 FORMS += \
-    mainwindow.ui
+    $$VIEW_DIR/mainwindow.ui
 
 # FFmpeg 头文件路径 - 使用更合适的上级目录
 INCLUDEPATH += /usr/include/x86_64-linux-gnu

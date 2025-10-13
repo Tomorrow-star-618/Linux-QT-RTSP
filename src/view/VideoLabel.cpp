@@ -1,11 +1,15 @@
 #include "VideoLabel.h"
 #include <QToolTip>
 #include <QDebug>
+#include <QCursor>
+#include <QEvent>
 
 // 构造函数，初始化成员变量
 VideoLabel::VideoLabel(QWidget* parent)
     : QLabel(parent), m_isDrawing(false), m_hasRectangle(false), 
-      m_showButtons(false), m_rectangleConfirmed(false), m_drawingEnabled(false)
+      m_showButtons(false), m_rectangleConfirmed(false), m_drawingEnabled(false),
+      m_hoverControlEnabled(false), m_isHovered(false), m_isPaused(false), 
+      m_cameraId(-1), m_boundIp(""), m_streamId(-1)
 {
     setMouseTracking(true); // 启用鼠标跟踪，便于捕捉鼠标移动事件
 }
@@ -47,6 +51,28 @@ void VideoLabel::setDrawingEnabled(bool enabled)
     update();
 }
 
+// 设置视频流信息
+void VideoLabel::setStreamInfo(int cameraId, const QString& cameraName, int streamId)
+{
+    m_cameraId = cameraId;
+    m_cameraName = cameraName;
+    m_streamId = streamId;
+}
+
+// 启用/禁用悬停控制条
+void VideoLabel::setHoverControlEnabled(bool enabled)
+{
+    m_hoverControlEnabled = enabled;
+    update();
+}
+
+// 设置暂停状态
+void VideoLabel::setPaused(bool paused)
+{
+    m_isPaused = paused;
+    update(); // 触发重绘，更新按钮图标
+}
+
 void VideoLabel::paintEvent(QPaintEvent* event)
 {
     // 先调用父类的paintEvent绘制视频图像
@@ -63,10 +89,31 @@ void VideoLabel::paintEvent(QPaintEvent* event)
             drawButtons(painter);
         }
     }
+    
+    // 绘制悬停控制条（多路显示时）- 仅在鼠标悬停时显示
+    if (m_hoverControlEnabled && m_isHovered) {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        drawHoverControl(painter);
+    }
 }
 
 void VideoLabel::mousePressEvent(QMouseEvent* event)
 {
+    // 优先处理悬停控制条的按钮点击（只有在悬停时才可点击）
+    if (event->button() == Qt::LeftButton && m_hoverControlEnabled && m_isHovered) {
+        int buttonIndex = getHoverControlButtonAt(event->pos());
+        if (buttonIndex > 0) {
+            switch (buttonIndex) {
+                case 1: emit addCameraClicked(m_streamId); break;
+                case 2: emit pauseStreamClicked(m_streamId); break;
+                case 3: emit screenshotClicked(m_streamId); break;
+                case 4: emit closeStreamClicked(m_streamId); break;
+            }
+            return;
+        }
+    }
+    
     // 如果按下的是鼠标左键且绘制功能已启用，则进入绘制流程
     if (event->button() == Qt::LeftButton && m_drawingEnabled) {
         // 检查是否点击了按钮
@@ -102,14 +149,18 @@ void VideoLabel::mousePressEvent(QMouseEvent* event)
 
 void VideoLabel::mouseMoveEvent(QMouseEvent* event)
 {
-    // 如果未启用绘制功能，则将鼠标指针设置为箭头并返回
-    if (!m_drawingEnabled) {
-        setCursor(Qt::ArrowCursor);
-        return;
+    // 优先检查是否在悬停控制条的按钮上（只有悬停时才检查）
+    if (m_hoverControlEnabled && m_isHovered) {
+        int buttonIndex = getHoverControlButtonAt(event->pos());
+        if (buttonIndex > 0) {
+            setCursor(Qt::PointingHandCursor); // 在按钮上显示手型光标
+            update(); // 触发重绘以更新按钮的悬停效果
+            return;
+        }
     }
     
     // 如果正在绘制矩形框
-    if (m_isDrawing) {
+    if (m_isDrawing && m_drawingEnabled) {
         // 将鼠标位置限制在视频区域内
         QRect videoRect = rect();
         QPoint pos = event->pos();
@@ -118,12 +169,16 @@ void VideoLabel::mouseMoveEvent(QMouseEvent* event)
         
         m_endPoint = pos;
         update(); // 实时刷新绘制区域
-    } else {
+        return;
+    }
+    
+    // 处理绘制模式下的光标
+    if (m_drawingEnabled) {
         // 如果鼠标在视频区域内或按钮上
         if (rect().contains(event->pos())) {
             // 如果显示按钮且矩形框未确认
             if (m_showButtons && !m_rectangleConfirmed) {
-                // 如果鼠标在“确定”或“取消”按钮上
+                // 如果鼠标在"确定"或"取消"按钮上
                 if (isPointInButton(event->pos(), m_confirmButtonRect) || 
                     isPointInButton(event->pos(), m_cancelButtonRect)) {
                     setCursor(Qt::PointingHandCursor);  // 设置为手型光标
@@ -136,7 +191,12 @@ void VideoLabel::mouseMoveEvent(QMouseEvent* event)
         } else {
             setCursor(Qt::ArrowCursor); // 设置为箭头光标
         }
+    } else {
+        // 非绘制模式，默认箭头光标
+        setCursor(Qt::ArrowCursor);
     }
+    
+    update(); // 更新显示
 }
 
 void VideoLabel::mouseReleaseEvent(QMouseEvent* event)
@@ -330,5 +390,203 @@ void VideoLabel::updateButtonPositions()
 bool VideoLabel::isPointInButton(const QPoint& pos, const QRect& buttonRect) const
 {
     return buttonRect.contains(pos);
-} 
+}
+
+// 鼠标进入事件
+void VideoLabel::enterEvent(QEvent* event)
+{
+    QLabel::enterEvent(event);
+    if (m_hoverControlEnabled) {
+        m_isHovered = true;
+        update(); // 触发重绘以显示悬停控制条
+    }
+}
+
+// 鼠标离开事件
+void VideoLabel::leaveEvent(QEvent* event)
+{
+    QLabel::leaveEvent(event);
+    if (m_hoverControlEnabled) {
+        m_isHovered = false;
+        update(); // 触发重绘以隐藏悬停控制条
+    }
+}
+
+// 鼠标双击事件
+void VideoLabel::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        // 发射双击信号，通知选中该视频流
+        emit streamDoubleClicked(m_streamId);
+        qDebug() << "双击VideoLabel，streamId:" << m_streamId << "cameraId:" << m_cameraId;
+    }
+    QLabel::mouseDoubleClickEvent(event);
+}
+
+// 绘制悬停控制条
+void VideoLabel::drawHoverControl(QPainter& painter)
+{
+    updateHoverControlPositions();
+    
+    // 绘制半透明背景条
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QBrush(QColor(0, 0, 0, 180))); // 黑色半透明背景
+    painter.drawRect(m_hoverControlRect);
+    
+    // 根据控制条高度自适应文字大小
+    int barHeight = m_hoverControlRect.height();
+    int fontSize = qMax(7, qMin(14, static_cast<int>(barHeight / 2.5))); // 字体大小在7-14之间，除以2.5获得更大字体
+    
+    // 绘制左侧文字信息（摄像头ID和名称）
+    painter.setPen(Qt::white);
+    QFont font = painter.font();
+    font.setPixelSize(fontSize);
+    font.setBold(true);
+    painter.setFont(font);
+    
+    // 判断是否有视频流（streamId >= 0 表示有视频流）
+    bool hasStream = (m_streamId >= 0);
+    
+    QString infoText;
+    if (hasStream) {
+        // 有视频流：显示"位置 X - 摄像头名称 [IP地址]"
+        if (!m_boundIp.isEmpty()) {
+            infoText = QString("位置 %1 - %2 [%3]").arg(m_cameraId).arg(m_cameraName).arg(m_boundIp);
+        } else {
+            infoText = QString("位置 %1 - %2").arg(m_cameraId).arg(m_cameraName);
+        }
+    } else {
+        // 无视频流：显示"位置 X - 空闲"
+        infoText = QString("位置 %1 - 空闲").arg(m_cameraId);
+    }
+    
+    int leftMargin = qMax(3, barHeight / 8);
+    int textX = m_hoverControlRect.x() + leftMargin;
+    int textY = m_hoverControlRect.y() + (m_hoverControlRect.height() + painter.fontMetrics().height()) / 2 - 2;
+    
+    // 计算文字可用宽度（控制条宽度 - 左边距 - 按钮区域宽度 - 右边距）
+    int buttonSize = qMax(14, qMin(32, barHeight - 6));
+    int buttonSpacing = qMax(2, buttonSize / 6);
+    int rightMargin = qMax(3, barHeight / 8);
+    
+    // 根据是否有视频流计算按钮宽度
+    int buttonsWidth;
+    if (hasStream) {
+        // 有视频流：显示4个按钮（添加、暂停、截图、关闭）
+        buttonsWidth = buttonSize * 4 + buttonSpacing * 3 + rightMargin;
+    } else {
+        // 无视频流：只显示1个按钮（添加）
+        buttonsWidth = buttonSize + rightMargin;
+    }
+    
+    int availableWidth = m_hoverControlRect.width() - textX - buttonsWidth - 5;
+    
+    // 使用省略文字以适应可用宽度
+    QString elidedText = painter.fontMetrics().elidedText(infoText, Qt::ElideRight, availableWidth);
+    painter.drawText(textX, textY, elidedText);
+    
+    // 根据是否有视频流绘制不同的按钮
+    if (hasStream) {
+        // 有视频流：绘制四个按钮
+        drawHoverControlButton(painter, m_addButtonRect, "+", QColor(0, 120, 212));      // 蓝色 - 添加
+        // 根据暂停状态显示不同图标：暂停时显示播放三角形▶，播放时显示暂停||
+        QString pauseIcon = m_isPaused ? "▶" : "||";
+        drawHoverControlButton(painter, m_pauseButtonRect, pauseIcon, QColor(255, 140, 0));   // 橙色 - 暂停/播放
+        drawHoverControlButton(painter, m_screenshotButtonRect, "□", QColor(34, 139, 34)); // 绿色 - 截图
+        drawHoverControlButton(painter, m_closeButtonRect, "×", QColor(220, 53, 69));    // 红色 - 关闭
+    } else {
+        // 无视频流：只绘制添加按钮（在右侧居中位置）
+        drawHoverControlButton(painter, m_addButtonRect, "+", QColor(0, 120, 212));      // 蓝色 - 添加
+    }
+}
+
+// 辅助函数：绘制单个控制按钮
+void VideoLabel::drawHoverControlButton(QPainter& painter, const QRect& rect, const QString& text, const QColor& color)
+{
+    // 检查鼠标是否悬停在按钮上
+    QPoint mousePos = mapFromGlobal(QCursor::pos());
+    bool isHovered = rect.contains(mousePos);
+    
+    // 根据按钮大小自适应圆角半径
+    int cornerRadius = qMax(2, qMin(4, rect.width() / 8));
+    
+    // 绘制按钮背景
+    painter.setPen(Qt::NoPen);
+    if (isHovered) {
+        painter.setBrush(QBrush(color.lighter(120))); // 悬停时更亮
+    } else {
+        painter.setBrush(QBrush(color));
+    }
+    painter.drawRoundedRect(rect, cornerRadius, cornerRadius);
+    
+    // 根据按钮大小自适应字体大小
+    // 修改算法：使用更大的字体，确保16路时清晰
+    int buttonFontSize = qMax(8, qMin(18, static_cast<int>(rect.height() * 0.65))); // 字体大小为按钮高度的65%
+    
+    // 绘制按钮文字/图标
+    painter.setPen(Qt::white);
+    QFont font = painter.font();
+    font.setPixelSize(buttonFontSize);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.drawText(rect, Qt::AlignCenter, text);
+}
+
+// 更新悬停控制条的位置 - 自适应大小
+void VideoLabel::updateHoverControlPositions()
+{
+    // 根据VideoLabel的高度自适应控制条高度
+    // 小窗口（如16路）使用较小的高度，大窗口使用较大的高度
+    int labelHeight = height();
+    // 修改算法：使用更合理的比例，确保16路时也能显示
+    int barHeight = qMax(22, qMin(45, labelHeight / 6)); // 高度在22-45之间，除以6而不是8
+    
+    // 按钮大小也自适应，确保至少14像素
+    int buttonSize = qMax(14, qMin(32, barHeight - 6)); // 按钮略小于控制条，最小14
+    int buttonSpacing = qMax(2, buttonSize / 6); // 间距为按钮大小的1/6，减少间距
+    int rightMargin = qMax(3, barHeight / 8);
+    
+    // 控制条位于顶部
+    m_hoverControlRect = QRect(0, 0, width(), barHeight);
+    
+    int buttonY = (barHeight - buttonSize) / 2;
+    
+    // 判断是否有视频流
+    bool hasStream = (m_streamId >= 0);
+    
+    if (hasStream) {
+        // 有视频流：四个按钮从右到左排列
+        int currentX = width() - rightMargin - buttonSize;
+        
+        m_closeButtonRect = QRect(currentX, buttonY, buttonSize, buttonSize);
+        currentX -= (buttonSize + buttonSpacing);
+        
+        m_screenshotButtonRect = QRect(currentX, buttonY, buttonSize, buttonSize);
+        currentX -= (buttonSize + buttonSpacing);
+        
+        m_pauseButtonRect = QRect(currentX, buttonY, buttonSize, buttonSize);
+        currentX -= (buttonSize + buttonSpacing);
+        
+        m_addButtonRect = QRect(currentX, buttonY, buttonSize, buttonSize);
+    } else {
+        // 无视频流：只显示一个添加按钮，位于右侧
+        int currentX = width() - rightMargin - buttonSize;
+        m_addButtonRect = QRect(currentX, buttonY, buttonSize, buttonSize);
+        
+        // 其他按钮设置为空矩形（不会被绘制和点击）
+        m_pauseButtonRect = QRect();
+        m_screenshotButtonRect = QRect();
+        m_closeButtonRect = QRect();
+    }
+}
+
+// 判断点是否在悬停控制条的某个按钮内
+int VideoLabel::getHoverControlButtonAt(const QPoint& pos) const
+{
+    if (m_addButtonRect.contains(pos)) return 1;       // 添加按钮
+    if (m_pauseButtonRect.contains(pos)) return 2;     // 暂停按钮
+    if (m_screenshotButtonRect.contains(pos)) return 3; // 截图按钮
+    if (m_closeButtonRect.contains(pos)) return 4;     // 关闭按钮
+    return 0; // 无按钮
+}
 
