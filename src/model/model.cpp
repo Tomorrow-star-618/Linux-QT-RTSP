@@ -97,22 +97,61 @@ bool Model::openDecoder(AVFormatContext* fmt_ctx, int videoStream, AVCodecContex
 void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_ctx, int videoStream) {
     AVFrame* frame = av_frame_alloc();      // 原始帧
     AVFrame* rgbFrame = av_frame_alloc();   // RGB帧
+    
+    // 检查帧分配是否成功
+    if (!frame || !rgbFrame) {
+        if (frame) av_frame_free(&frame);
+        if (rgbFrame) av_frame_free(&rgbFrame);
+        return;
+    }
+    
     // 创建图像转换上下文
     SwsContext* sws_ctx = sws_getContext(codec_ctx->width, codec_ctx->height, codec_ctx->pix_fmt,
                                          codec_ctx->width, codec_ctx->height, AV_PIX_FMT_RGB24,
                                          SWS_BILINEAR, nullptr, nullptr, nullptr);
+    if (!sws_ctx) {
+        av_frame_free(&frame);
+        av_frame_free(&rgbFrame);
+        return;
+    }
+    
     int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, codec_ctx->width, codec_ctx->height, 1);
     uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // 分配RGB缓冲区
+    if (!buffer) {
+        av_frame_free(&frame);
+        av_frame_free(&rgbFrame);
+        sws_freeContext(sws_ctx);
+        return;
+    }
+    
     av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer, AV_PIX_FMT_RGB24,
                         codec_ctx->width, codec_ctx->height, 1);
     AVPacket pkt;
+    int readResult = 0;
+    
     // 读取视频帧主循环
-    while (!m_stop && av_read_frame(fmt_ctx, &pkt) >= 0) {
+    while (!m_stop) {
+        readResult = av_read_frame(fmt_ctx, &pkt);
+        
+        // 如果读取失败（推流端断开或其他错误）
+        if (readResult < 0) {
+            // 检查是否是EOF或连接断开
+            if (readResult == AVERROR_EOF || readResult == AVERROR(EIO) || 
+                readResult == AVERROR(EPIPE) || readResult == AVERROR(ECONNRESET)) {
+                // 流结束或连接断开，正常退出循环，准备重连
+                break;
+            }
+            // 其他错误，稍作延迟后继续尝试
+            QThread::msleep(100);
+            continue;
+        }
+        
         m_mutex.lock();
         if (m_pause) {
             m_wait.wait(&m_mutex); // 如果暂停，等待唤醒
         }
         m_mutex.unlock();
+        
         if (pkt.stream_index == videoStream) {
             // 发送包到解码器
             if (avcodec_send_packet(codec_ctx, &pkt) == 0) {
@@ -129,6 +168,7 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_
             }
         }
         av_packet_unref(&pkt); // 释放包
+        
         m_mutex.lock();
         if (m_stop) {
             m_mutex.unlock();
@@ -136,8 +176,12 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_
         }
         m_mutex.unlock();
     }
-    // 释放帧和转换上下文等资源
-    cleanup(nullptr, codec_ctx, frame, rgbFrame, buffer, sws_ctx);
+    
+    // 释放帧和转换上下文等资源（注意：不在这里释放fmt_ctx和codec_ctx）
+    if (buffer) av_free(buffer);
+    if (rgbFrame) av_frame_free(&rgbFrame);
+    if (frame) av_frame_free(&frame);
+    if (sws_ctx) sws_freeContext(sws_ctx);
 }
 
 // 释放所有相关资源
@@ -185,12 +229,28 @@ void Model::run()
         }
         // 读取并解码帧
         readAndDecodeFrames(fmt_ctx, codec_ctx, videoStream);
-        // 释放资源
-        cleanup(fmt_ctx, codec_ctx, nullptr, nullptr, nullptr, nullptr);
-        // 如果没有停止，则等待新的信号
+        
+        // 释放资源（fmt_ctx和codec_ctx在这里释放）
+        if (codec_ctx) avcodec_free_context(&codec_ctx);
+        if (fmt_ctx) avformat_close_input(&fmt_ctx);
+        
+        // 检查是否需要停止
         m_mutex.lock();
-        if (!m_stop)
-            m_wait.wait(&m_mutex);
+        bool shouldStop = m_stop;
+        QString currentUrl = m_url;
         m_mutex.unlock();
+        
+        if (shouldStop) {
+            break; // 如果需要停止，退出主循环
+        }
+        
+        // 如果不是主动停止，说明是连接断开
+        emit streamDisconnected(currentUrl);
+        
+        // 等待一段时间后尝试重连
+        QThread::msleep(2000); // 等待2秒后重连
+        
+        // 发出重连信号
+        emit streamReconnecting(currentUrl);
     }
 } 

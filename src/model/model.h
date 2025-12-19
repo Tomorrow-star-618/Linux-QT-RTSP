@@ -24,6 +24,8 @@ public:
 
 signals:
     void frameReady(const QImage& img);        // 视频帧准备好时发出信号，传递QImage
+    void streamDisconnected(const QString& url); // 视频流断开信号
+    void streamReconnecting(const QString& url); // 视频流重连信号
 
 protected:
     void run() override;                       // 线程主函数，处理视频流解码

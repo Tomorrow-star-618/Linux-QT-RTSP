@@ -13,6 +13,7 @@
 #include <QLabel>
 #include <QSplitter>
 #include <QGroupBox>
+#include <QComboBox>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
@@ -24,6 +25,7 @@
 // 方案数据结构
 struct PlanData {
     int id;                    // 方案ID（数据库主键）
+    int cameraId;              // 摄像头ID（0表示主流，1-N表示子流）
     QString name;              // 方案名称
     QString rtspUrl;           // RTSP地址
     bool aiEnabled;            // AI识别功能使能
@@ -32,7 +34,7 @@ struct PlanData {
     QSet<int> objectList;      // 对象列表（对象ID集合）
     
     // 默认构造函数
-    PlanData() : id(-1), aiEnabled(false), regionEnabled(false), objectEnabled(false) {}
+    PlanData() : id(-1), cameraId(0), aiEnabled(false), regionEnabled(false), objectEnabled(false) {}
 };
 
 class Plan : public QDialog
@@ -87,6 +89,7 @@ private:
     QPushButton* m_deleteButton;
     
     // 右侧方案配置
+    QComboBox* m_cameraIdComboBox;  // 摄像头ID选择（0=主流，1-N=子流）
     QLineEdit* m_nameEdit;          // 方案名称
     QLineEdit* m_rtspEdit;          // RTSP地址
     QCheckBox* m_aiCheckBox;        // AI功能

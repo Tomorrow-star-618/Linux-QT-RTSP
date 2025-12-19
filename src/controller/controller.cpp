@@ -33,6 +33,12 @@ Controller::Controller(Model* model, View* view, QObject* parent)
     }
     // 绑定更新视频流信号槽
     connect(m_model, &Model::frameReady, this, &Controller::onFrameReady);
+    connect(m_model, &Model::streamDisconnected, this, [this](const QString& url) {
+        m_view->addEventMessage("warning", QString("视频流断开: %1").arg(url));
+    });
+    connect(m_model, &Model::streamReconnecting, this, [this](const QString& url) {
+        m_view->addEventMessage("info", QString("正在尝试重连: %1").arg(url));
+    });
 
     // 绑定矩形框确认信号
     connect(m_view, &View::rectangleConfirmed, this, &Controller::onRectangleConfirmed);
@@ -887,12 +893,13 @@ void Controller::onTcpClientConnected(const QString& ip, quint16 port)
 
 void Controller::onPlanApplied(const PlanData& plan)
 {
-    qDebug() << "Controller接收到方案应用信号:" << plan.name;
+    qDebug() << "Controller接收到方案应用信号:" << plan.name << "目标摄像头ID:" << plan.cameraId;
     
     // 应用RTSP地址 - 自动启动视频流
     if (!plan.rtspUrl.isEmpty()) {
         m_model->startStream(plan.rtspUrl);
-        m_view->addEventMessage("info", QString("已设置RTSP地址: %1").arg(plan.rtspUrl));
+        QString cameraName = (plan.cameraId == 0) ? "主流" : QString("子流%1").arg(plan.cameraId);
+        m_view->addEventMessage("info", QString("[%1] 已设置RTSP地址: %2").arg(cameraName).arg(plan.rtspUrl));
     }
     
     // 获取功能按钮列表
@@ -910,8 +917,9 @@ void Controller::onPlanApplied(const PlanData& plan)
         return;
     }
     
-    // 获取当前摄像头ID
-    int targetCameraId = tcpWin->getCurrentCameraId();
+    // 使用方案中指定的摄像头ID作为目标
+    int targetCameraId = plan.cameraId;
+    QString cameraName = (targetCameraId == 0) ? "主流" : QString("子流%1").arg(targetCameraId);
     
     // 应用AI功能设置
     QPushButton* aiBtn = funButtons[0];
@@ -920,7 +928,7 @@ void Controller::onPlanApplied(const PlanData& plan)
         if (tcpWin && tcpWin->hasConnectedClients()) {
             tcpWin->Tcp_sent_info(targetCameraId, DEVICE_CAMERA, CAMERA_AI_ENABLE, plan.aiEnabled ? 1 : 0);
         }
-        m_view->addEventMessage("info", QString("AI功能已%1").arg(plan.aiEnabled ? "启用" : "禁用"));
+        m_view->addEventMessage("info", QString("[%1] AI功能已%2").arg(cameraName).arg(plan.aiEnabled ? "启用" : "禁用"));
     }
     
     // 应用区域识别设置
@@ -930,7 +938,7 @@ void Controller::onPlanApplied(const PlanData& plan)
         if (tcpWin && tcpWin->hasConnectedClients()) {
             tcpWin->Tcp_sent_info(targetCameraId, DEVICE_CAMERA, CAMERA_REGION_ENABLE, plan.regionEnabled ? 1 : 0);
         }
-        m_view->addEventMessage("info", QString("区域识别功能已%1").arg(plan.regionEnabled ? "启用" : "禁用"));
+        m_view->addEventMessage("info", QString("[%1] 区域识别功能已%2").arg(cameraName).arg(plan.regionEnabled ? "启用" : "禁用"));
     }
     
     // 应用对象识别设置
@@ -940,7 +948,7 @@ void Controller::onPlanApplied(const PlanData& plan)
         if (tcpWin && tcpWin->hasConnectedClients()) {
             tcpWin->Tcp_sent_info(targetCameraId, DEVICE_CAMERA, CAMERA_OBJECT_ENABLE, plan.objectEnabled ? 1 : 0);
         }
-        m_view->addEventMessage("info", QString("对象识别功能已%1").arg(plan.objectEnabled ? "启用" : "禁用"));
+        m_view->addEventMessage("info", QString("[%1] 对象识别功能已%2").arg(cameraName).arg(plan.objectEnabled ? "启用" : "禁用"));
     }
     
     // 应用对象列表设置
@@ -965,11 +973,12 @@ void Controller::onPlanApplied(const PlanData& plan)
                 }
             }
             
-            m_view->addEventMessage("info", QString("已设置检测对象列表(%1个): %2")
+            m_view->addEventMessage("info", QString("[%1] 已设置检测对象列表(%2个): %3")
+                .arg(cameraName)
                 .arg(m_selectedObjectIds.size())
                 .arg(selectedNames.join(", ")));
         } else {
-            m_view->addEventMessage("warning", "对象列表已设置，但无TCP连接无法发送");
+            m_view->addEventMessage("warning", QString("[%1] 对象列表已设置，但无TCP连接无法发送").arg(cameraName));
         }
     }
     
@@ -1037,6 +1046,15 @@ void Controller::addVideoStream(const QString& url, const QString& name, int cam
     // 连接帧信号（使用lambda捕获streamId）
     connect(model, &Model::frameReady, this, [this, streamId](const QImage& frame) {
         onModelFrameReady(streamId, frame);
+    });
+    
+    // 连接流断开和重连信号
+    connect(model, &Model::streamDisconnected, this, [this, cameraId, name](const QString& url) {
+        m_view->addEventMessage("warning", QString("摄像头 %1 (%2) 断开连接").arg(cameraId).arg(name));
+    });
+    
+    connect(model, &Model::streamReconnecting, this, [this, cameraId, name](const QString& url) {
+        m_view->addEventMessage("info", QString("摄像头 %1 (%2) 正在尝试重连...").arg(cameraId).arg(name));
     });
     
     // 启动视频流

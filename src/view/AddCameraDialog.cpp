@@ -77,8 +77,8 @@ void AddCameraDialog::setupUI()
     // 2. RTSP地址输入
     rtspUrlLineEdit = new QLineEdit(this);
     rtspUrlLineEdit->setMinimumHeight(30);
-    rtspUrlLineEdit->setPlaceholderText("rtsp://192.168.1.130/live/0");
-    rtspUrlLineEdit->setText("rtsp://192.168.1.130/live/0"); // 默认地址
+    rtspUrlLineEdit->setPlaceholderText("rtsp://192.168.1.158/live/0");
+    rtspUrlLineEdit->setText("rtsp://192.168.1.158/live/0"); // 默认地址
     
     QLabel* urlLabel = new QLabel("RTSP地址:", this);
     urlLabel->setStyleSheet("font-weight: bold; color: #333333;");

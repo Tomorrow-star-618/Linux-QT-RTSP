@@ -164,20 +164,60 @@ void Plan::initUI()
     
     QGridLayout* configLayout = new QGridLayout(configGroup);
     
+    // 摄像头ID选择
+    configLayout->addWidget(new QLabel("目标摄像头:"), 0, 0);
+    m_cameraIdComboBox = new QComboBox();
+    m_cameraIdComboBox->addItem("主流（ID: 0）", 0);
+    for (int i = 1; i <= 16; ++i) {
+        m_cameraIdComboBox->addItem(QString("子流%1（ID: %2）").arg(i).arg(i), i);
+    }
+    m_cameraIdComboBox->setStyleSheet(
+        "QComboBox {"
+        "  font-family: 'Microsoft YaHei';"
+        "  font-size: 12px;"
+        "  border: 1px solid #2196F3;"
+        "  border-radius: 4px;"
+        "  padding: 4px 8px;"
+        "  background: white;"
+        "  selection-background-color: #2196F3;"
+        "}"
+        "QComboBox::drop-down {"
+        "  border: none;"
+        "  width: 20px;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  image: none;"
+        "  border-left: 5px solid transparent;"
+        "  border-right: 5px solid transparent;"
+        "  border-top: 6px solid #2196F3;"
+        "  margin-right: 5px;"
+        "}"
+        "QComboBox:hover {"
+        "  border: 1px solid #1976D2;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "  border: 1px solid #2196F3;"
+        "  selection-background-color: #2196F3;"
+        "  selection-color: white;"
+        "  background: white;"
+        "}"
+    );
+    configLayout->addWidget(m_cameraIdComboBox, 0, 1);
+    
     // 方案名称
-    configLayout->addWidget(new QLabel("方案名称:"), 0, 0);
+    configLayout->addWidget(new QLabel("方案名称:"), 1, 0);
     m_nameEdit = new QLineEdit();
     m_nameEdit->setPlaceholderText("请输入方案名称");
-    configLayout->addWidget(m_nameEdit, 0, 1);
+    configLayout->addWidget(m_nameEdit, 1, 1);
     
     // RTSP地址
-    configLayout->addWidget(new QLabel("RTSP地址:"), 1, 0);
+    configLayout->addWidget(new QLabel("RTSP地址:"), 2, 0);
     m_rtspEdit = new QLineEdit();
-    m_rtspEdit->setPlaceholderText("rtsp://192.168.1.130/live/0");
-    configLayout->addWidget(m_rtspEdit, 1, 1);
+    m_rtspEdit->setPlaceholderText("rtsp://192.168.1.158/live/0");
+    configLayout->addWidget(m_rtspEdit, 2, 1);
     
     // 功能使能
-    configLayout->addWidget(new QLabel("功能配置:"), 2, 0);
+    configLayout->addWidget(new QLabel("功能配置:"), 3, 0);
     QVBoxLayout* checkBoxLayout = new QVBoxLayout();
     
     m_aiCheckBox = new QCheckBox("AI识别功能");
@@ -190,10 +230,10 @@ void Plan::initUI()
     
     QWidget* checkBoxWidget = new QWidget();
     checkBoxWidget->setLayout(checkBoxLayout);
-    configLayout->addWidget(checkBoxWidget, 2, 1);
+    configLayout->addWidget(checkBoxWidget, 3, 1);
     
     // 对象列表
-    configLayout->addWidget(new QLabel("对象列表:"), 3, 0, Qt::AlignTop);
+    configLayout->addWidget(new QLabel("对象列表:"), 4, 0, Qt::AlignTop);
     QVBoxLayout* objectLayout = new QVBoxLayout();
     
     m_objectListEdit = new QTextEdit();
@@ -221,7 +261,7 @@ void Plan::initUI()
     
     QWidget* objectWidget = new QWidget();
     objectWidget->setLayout(objectLayout);
-    configLayout->addWidget(objectWidget, 3, 1);
+    configLayout->addWidget(objectWidget, 4, 1);
     
     rightLayout->addWidget(configGroup);
     
@@ -316,6 +356,7 @@ void Plan::initUI()
     });
     
     // 表单数据变化监听
+    connect(m_cameraIdComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Plan::onFormDataChanged);
     connect(m_nameEdit, &QLineEdit::textChanged, this, &Plan::onFormDataChanged);
     connect(m_rtspEdit, &QLineEdit::textChanged, this, &Plan::onFormDataChanged);
     connect(m_aiCheckBox, &QCheckBox::toggled, this, &Plan::onFormDataChanged);
@@ -413,30 +454,104 @@ bool Plan::createPlanTable()
     // 创建SQL查询对象，绑定到已打开的数据库连接
     QSqlQuery query(m_database);
     
-    // 定义创建表的SQL语句 - 使用原始字符串字面量(R"(...)")避免转义字符问题
-    QString createTableSql = R"(
-        CREATE TABLE IF NOT EXISTS plans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,  -- 主键，自动递增
-            name TEXT NOT NULL UNIQUE,             -- 方案名称，非空且唯一
-            rtsp_url TEXT NOT NULL,                -- RTSP地址，非空
-            ai_enabled INTEGER DEFAULT 0,          -- AI功能开关，0=关闭，1=开启
-            region_enabled INTEGER DEFAULT 0,      -- 区域识别开关，0=关闭，1=开启
-            object_enabled INTEGER DEFAULT 0,      -- 对象识别开关，0=关闭，1=开启
-            object_list TEXT DEFAULT '',           -- 检测对象列表，JSON格式存储
-            created_time DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 创建时间，自动设置
-            updated_time DATETIME DEFAULT CURRENT_TIMESTAMP   -- 更新时间，自动设置
-        )
-    )";
+    // 检查表是否已存在
+    query.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='plans'");
+    bool tableExists = query.next();
     
-    // 执行SQL语句创建表
-    if (!query.exec(createTableSql)) {
-        // 如果创建失败，显示错误信息
-        QMessageBox::critical(this, "数据库错误", 
-            QString("创建表失败：%1").arg(query.lastError().text()));
-        return false;
+    if (tableExists) {
+        // 表已存在，检查是否有camera_id字段
+        query.exec("PRAGMA table_info(plans)");
+        bool hasCameraId = false;
+        while (query.next()) {
+            QString columnName = query.value(1).toString();
+            if (columnName == "camera_id") {
+                hasCameraId = true;
+                break;
+            }
+        }
+        
+        if (!hasCameraId) {
+            // 需要迁移：备份旧表，创建新表，迁移数据
+            qDebug() << "检测到旧版本数据库表，开始迁移...";
+            
+            // 1. 重命名旧表
+            if (!query.exec("ALTER TABLE plans RENAME TO plans_old")) {
+                QMessageBox::critical(this, "数据库迁移错误", 
+                    QString("重命名旧表失败：%1").arg(query.lastError().text()));
+                return false;
+            }
+            
+            // 2. 创建新表
+            QString createTableSql = R"(
+                CREATE TABLE plans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    camera_id INTEGER DEFAULT 0,
+                    name TEXT NOT NULL,
+                    rtsp_url TEXT NOT NULL,
+                    ai_enabled INTEGER DEFAULT 0,
+                    region_enabled INTEGER DEFAULT 0,
+                    object_enabled INTEGER DEFAULT 0,
+                    object_list TEXT DEFAULT '',
+                    created_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(camera_id, name)
+                )
+            )";
+            
+            if (!query.exec(createTableSql)) {
+                QMessageBox::critical(this, "数据库迁移错误", 
+                    QString("创建新表失败：%1").arg(query.lastError().text()));
+                return false;
+            }
+            
+            // 3. 迁移数据（所有旧方案默认为主流，camera_id=0）
+            QString migrateSql = R"(
+                INSERT INTO plans (id, camera_id, name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list, created_time, updated_time)
+                SELECT id, 0, name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list, created_time, updated_time
+                FROM plans_old
+            )";
+            
+            if (!query.exec(migrateSql)) {
+                QMessageBox::critical(this, "数据库迁移错误", 
+                    QString("迁移数据失败：%1").arg(query.lastError().text()));
+                return false;
+            }
+            
+            // 4. 删除旧表
+            if (!query.exec("DROP TABLE plans_old")) {
+                qDebug() << "警告：删除旧表失败，但不影响使用";
+            }
+            
+            qDebug() << "数据库迁移成功！";
+            QMessageBox::information(this, "数据库升级", 
+                "检测到旧版本数据库，已自动升级完成！\n所有旧方案已迁移为主流方案。");
+        }
+    } else {
+        // 表不存在，直接创建新表
+        QString createTableSql = R"(
+            CREATE TABLE plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                camera_id INTEGER DEFAULT 0,
+                name TEXT NOT NULL,
+                rtsp_url TEXT NOT NULL,
+                ai_enabled INTEGER DEFAULT 0,
+                region_enabled INTEGER DEFAULT 0,
+                object_enabled INTEGER DEFAULT 0,
+                object_list TEXT DEFAULT '',
+                created_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(camera_id, name)
+            )
+        )";
+        
+        if (!query.exec(createTableSql)) {
+            QMessageBox::critical(this, "数据库错误", 
+                QString("创建表失败：%1").arg(query.lastError().text()));
+            return false;
+        }
     }
     
-    return true;  // 创建成功
+    return true;  // 创建/迁移成功
 }
 
 bool Plan::loadPlansFromDatabase()
@@ -447,8 +562,8 @@ bool Plan::loadPlansFromDatabase()
     // 创建SQL查询对象
     QSqlQuery query(m_database);
     
-    // 执行SELECT语句从数据库查询所有方案数据，按ID排序
-    if (!query.exec("SELECT id, name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list FROM plans ORDER BY id")) {
+    // 执行SELECT语句从数据库查询所有方案数据，按camera_id和id排序
+    if (!query.exec("SELECT id, camera_id, name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list FROM plans ORDER BY camera_id, id")) {
         // 查询失败时显示警告
         QMessageBox::warning(this, "数据库错误", 
             QString("加载方案失败：%1").arg(query.lastError().text()));
@@ -460,13 +575,14 @@ bool Plan::loadPlansFromDatabase()
         PlanData plan;
         // 按字段索引读取数据并转换为对应类型
         plan.id = query.value(0).toInt();              // 第0列：id
-        plan.name = query.value(1).toString();         // 第1列：name
-        plan.rtspUrl = query.value(2).toString();      // 第2列：rtsp_url
-        plan.aiEnabled = query.value(3).toBool();      // 第3列：ai_enabled (转为bool)
-        plan.regionEnabled = query.value(4).toBool();  // 第4列：region_enabled (转为bool)
-        plan.objectEnabled = query.value(5).toBool();  // 第5列：object_enabled (转为bool)
-        // 第6列：object_list (JSON字符串转为QSet<int>)
-        plan.objectList = objectListFromJson(query.value(6).toString());
+        plan.cameraId = query.value(1).toInt();        // 第1列：camera_id
+        plan.name = query.value(2).toString();         // 第2列：name
+        plan.rtspUrl = query.value(3).toString();      // 第3列：rtsp_url
+        plan.aiEnabled = query.value(4).toBool();      // 第4列：ai_enabled (转为bool)
+        plan.regionEnabled = query.value(5).toBool();  // 第5列：region_enabled (转为bool)
+        plan.objectEnabled = query.value(6).toBool();  // 第6列：object_enabled (转为bool)
+        // 第7列：object_list (JSON字符串转为QSet<int>)
+        plan.objectList = objectListFromJson(query.value(7).toString());
         
         // 将转换后的方案对象添加到内存列表
         m_plans.append(plan);
@@ -485,10 +601,11 @@ bool Plan::savePlanToDatabase(const PlanData& plan)
         // 新增方案 - 当ID为-1时表示是新方案，需要插入到数据库
         // 使用预处理语句防止SQL注入攻击
         query.prepare(R"(
-            INSERT INTO plans (name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO plans (camera_id, name, rtsp_url, ai_enabled, region_enabled, object_enabled, object_list) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         )");
         // 按顺序绑定参数值
+        query.addBindValue(plan.cameraId);                                // 摄像头ID
         query.addBindValue(plan.name);                                    // 方案名称
         query.addBindValue(plan.rtspUrl);                                 // RTSP地址
         query.addBindValue(plan.aiEnabled ? 1 : 0);                      // AI开关（布尔转整数）
@@ -499,10 +616,11 @@ bool Plan::savePlanToDatabase(const PlanData& plan)
         // 更新现有方案 - 当ID大于0时表示是已存在的方案，需要更新数据库记录
         query.prepare(R"(
             UPDATE plans 
-            SET name=?, rtsp_url=?, ai_enabled=?, region_enabled=?, object_enabled=?, object_list=?, updated_time=CURRENT_TIMESTAMP 
+            SET camera_id=?, name=?, rtsp_url=?, ai_enabled=?, region_enabled=?, object_enabled=?, object_list=?, updated_time=CURRENT_TIMESTAMP 
             WHERE id=?
         )");
         // 按顺序绑定更新的参数值
+        query.addBindValue(plan.cameraId);                                // 摄像头ID
         query.addBindValue(plan.name);                                    // 方案名称
         query.addBindValue(plan.rtspUrl);                                 // RTSP地址
         query.addBindValue(plan.aiEnabled ? 1 : 0);                      // AI开关（布尔转整数）
@@ -559,12 +677,25 @@ void Plan::updatePlanList()
     
     // 遍历内存中的方案列表，为每个方案创建列表项
     for (const PlanData& plan : m_plans) {
-        // 创建新的列表项，显示方案名称
-        QListWidgetItem* item = new QListWidgetItem(plan.name);
+        // 创建新的列表项，显示方案名称和摄像头ID
+        QString displayText;
+        if (plan.cameraId == 0) {
+            displayText = QString("[主流] %1").arg(plan.name);
+        } else {
+            displayText = QString("[Cam%1] %2").arg(plan.cameraId).arg(plan.name);
+        }
+        QListWidgetItem* item = new QListWidgetItem(displayText);
         
         // 将方案ID存储在列表项的UserRole数据中，方便后续获取
         // UserRole是Qt预定义的角色，专门用于存储用户自定义数据
         item->setData(Qt::UserRole, plan.id);
+        
+        // 根据摄像头ID设置不同的颜色标识
+        if (plan.cameraId == 0) {
+            item->setForeground(QBrush(QColor("#1976D2")));  // 主流用蓝色
+        } else {
+            item->setForeground(QBrush(QColor("#388E3C")));  // 子流用绿色
+        }
         
         // 将列表项添加到列表控件中
         m_planListWidget->addItem(item);
@@ -581,6 +712,7 @@ void Plan::updateFormFromPlan(const PlanData& plan)
 {
     // 暂时阻止控件的信号发射，避免在更新表单数据时触发不必要的信号
     // 这可以防止循环调用和意外的数据修改标记
+    m_cameraIdComboBox->blockSignals(true);
     m_nameEdit->blockSignals(true);
     m_rtspEdit->blockSignals(true);
     m_aiCheckBox->blockSignals(true);
@@ -588,6 +720,7 @@ void Plan::updateFormFromPlan(const PlanData& plan)
     m_objectCheckBox->blockSignals(true);
     
     // 从PlanData对象更新表单控件的显示内容
+    m_cameraIdComboBox->setCurrentIndex(plan.cameraId);  // 设置摄像头ID（索引即为ID）
     m_nameEdit->setText(plan.name);                     // 设置方案名称
     m_rtspEdit->setText(plan.rtspUrl);                  // 设置RTSP地址
     m_aiCheckBox->setChecked(plan.aiEnabled);           // 设置AI功能开关状态
@@ -610,6 +743,7 @@ void Plan::updateFormFromPlan(const PlanData& plan)
     m_objectListEdit->setText(selectedNames.join(", "));
     
     // 恢复控件的信号发射功能
+    m_cameraIdComboBox->blockSignals(false);
     m_nameEdit->blockSignals(false);
     m_rtspEdit->blockSignals(false);
     m_aiCheckBox->blockSignals(false);
@@ -624,6 +758,7 @@ void Plan::updateFormFromPlan(const PlanData& plan)
 void Plan::updatePlanFromForm(PlanData& plan)
 {
     // 从表单控件获取用户输入的数据，更新到PlanData对象中
+    plan.cameraId = m_cameraIdComboBox->currentData().toInt(); // 获取选中的摄像头ID（从userData获取）
     plan.name = m_nameEdit->text().trimmed();              // 获取方案名称并去除首尾空格
     plan.rtspUrl = m_rtspEdit->text().trimmed();           // 获取RTSP地址并去除首尾空格
     plan.aiEnabled = m_aiCheckBox->isChecked();            // 获取AI功能开关状态
@@ -636,6 +771,7 @@ void Plan::updatePlanFromForm(PlanData& plan)
 
 void Plan::clearForm()
 {
+    m_cameraIdComboBox->setCurrentIndex(0);
     m_nameEdit->clear();
     m_rtspEdit->clear();
     m_aiCheckBox->setChecked(false);
@@ -649,6 +785,7 @@ void Plan::clearForm()
 
 void Plan::enableFormControls(bool enabled)
 {
+    m_cameraIdComboBox->setEnabled(enabled);
     m_nameEdit->setEnabled(enabled);
     m_rtspEdit->setEnabled(enabled);
     m_aiCheckBox->setEnabled(enabled);
@@ -710,37 +847,50 @@ QSet<int> Plan::objectListFromJson(const QString& jsonString)
 
 void Plan::createDefaultPlans()
 {
-    // 创建三个默认方案
+    // 创建多路默认方案示例
     QList<PlanData> defaultPlans;
     
-    // 方案1：基础监控
+    // 主流方案1：基础监控
     PlanData plan1;
+    plan1.cameraId = 0;  // 主流
     plan1.name = "基础监控方案";
-    plan1.rtspUrl = "rtsp://192.168.1.130/live/0";
+    plan1.rtspUrl = "rtsp://192.168.1.158/live/0";
     plan1.aiEnabled = true;
     plan1.regionEnabled = false;
     plan1.objectEnabled = true;
     plan1.objectList = {0, 15}; // 人和猫（示例）
     
-    // 方案2：区域监控
+    // 主流方案2：全功能监控
     PlanData plan2;
-    plan2.name = "区域监控方案";
-    plan2.rtspUrl = "rtsp://192.168.1.131/live/0";
+    plan2.cameraId = 0;  // 主流
+    plan2.name = "全功能监控方案";
+    plan2.rtspUrl = "rtsp://192.168.1.130/live/0";
     plan2.aiEnabled = true;
     plan2.regionEnabled = true;
     plan2.objectEnabled = true;
-    plan2.objectList = {0, 1, 2}; // 人、自行车、汽车
+    plan2.objectList = {0, 1, 2, 3, 5, 7}; // 多种对象
     
-    // 方案3：全功能监控
+    // 子流1方案：区域监控
     PlanData plan3;
-    plan3.name = "全功能监控方案";
-    plan3.rtspUrl = "rtsp://192.168.1.132/live/0";
+    plan3.cameraId = 1;  // 子流1
+    plan3.name = "区域监控方案";
+    plan3.rtspUrl = "rtsp://192.168.1.131/live/1";
     plan3.aiEnabled = true;
     plan3.regionEnabled = true;
     plan3.objectEnabled = true;
-    plan3.objectList = {0, 1, 2, 3, 5, 7}; // 多种对象
+    plan3.objectList = {0, 1, 2}; // 人、自行车、汽车
     
-    defaultPlans << plan1 << plan2 << plan3;
+    // 子流2方案：简单监控
+    PlanData plan4;
+    plan4.cameraId = 2;  // 子流2
+    plan4.name = "简单监控方案";
+    plan4.rtspUrl = "rtsp://192.168.1.132/live/2";
+    plan4.aiEnabled = true;
+    plan4.regionEnabled = false;
+    plan4.objectEnabled = true;
+    plan4.objectList = {0}; // 只检测人
+    
+    defaultPlans << plan1 << plan2 << plan3 << plan4;
     
     // 保存到数据库
     for (const PlanData& plan : defaultPlans) {
@@ -785,6 +935,7 @@ void Plan::onNewPlan()
     PlanData newPlan;
     
     // 为新方案设置默认值
+    newPlan.cameraId = 0;                                          // 默认为主流
     newPlan.name = QString("新方案 %1").arg(m_plans.size() + 1);    // 自动生成方案名称
     newPlan.rtspUrl = "rtsp://192.168.1.130/live/0";               // 设置默认RTSP地址
     newPlan.aiEnabled = false;                                     // 默认关闭AI功能
@@ -836,10 +987,18 @@ void Plan::onSavePlan()
         return;
     }
     
-    // 检查方案名称是否与其他方案重复（排除当前正在编辑的方案）
+    // 获取当前选择的摄像头ID
+    int currentCameraId = m_cameraIdComboBox->currentData().toInt();
+    
+    // 检查同一摄像头下方案名称是否重复（排除当前正在编辑的方案）
     for (int i = 0; i < m_plans.size(); ++i) {
-        if (i != m_currentPlanIndex && m_plans[i].name == name) {
-            QMessageBox::warning(this, "保存错误", "方案名称已存在，请使用其他名称！");
+        if (i != m_currentPlanIndex && 
+            m_plans[i].cameraId == currentCameraId && 
+            m_plans[i].name == name) {
+            QString cameraName = (currentCameraId == 0) ? "主流" : QString("子流%1").arg(currentCameraId);
+            QMessageBox::warning(this, "保存错误", 
+                QString("在%1中，方案名称 \"%2\" 已存在，请使用其他名称！")
+                .arg(cameraName).arg(name));
             m_nameEdit->setFocus();     // 将焦点设置到名称编辑框
             m_nameEdit->selectAll();    // 选中所有文本，方便用户重新输入
             return;
@@ -931,14 +1090,19 @@ void Plan::onApplyPlan()
     const PlanData& plan = m_plans[m_currentPlanIndex];
     
     // 显示应用方案的确认对话框，详细列出将要执行的配置
+    QString cameraName = (plan.cameraId == 0) ? "主流" : QString("子流%1").arg(plan.cameraId);
     int ret = QMessageBox::question(this, "应用方案", 
-        QString("确定要应用方案 \"%1\" 吗？\n这将会：\n"
-               "• 设置RTSP地址：%2\n"
-               "• 配置AI功能：%3\n"
-               "• 配置区域识别：%4\n"
-               "• 配置对象识别：%5\n"
+        QString("确定要应用方案 \"%1\" 到 [%2] 吗？\n这将会：\n"
+               "• 目标摄像头：%3（ID: %4）\n"
+               "• 设置RTSP地址：%5\n"
+               "• 配置AI功能：%6\n"
+               "• 配置区域识别：%7\n"
+               "• 配置对象识别：%8\n"
                "• 设置检测对象列表")
         .arg(plan.name)                                        // 方案名称
+        .arg(cameraName)                                       // 摄像头名称
+        .arg(cameraName)                                       // 摄像头名称
+        .arg(plan.cameraId)                                    // 摄像头ID
         .arg(plan.rtspUrl)                                     // RTSP地址
         .arg(plan.aiEnabled ? "启用" : "禁用")                  // AI功能状态
         .arg(plan.regionEnabled ? "启用" : "禁用")              // 区域识别状态
