@@ -87,6 +87,7 @@ private slots:
     void socketStateChange(QAbstractSocket::SocketState state); // socket状态变化处理
 
 private:
+    QString getLocalIPAddress();       // 获取本机首选IPv4地址（自动选择最佳IP）
     void getLocalHostIP();             // 获取本地所有IP
     void processDetectionData(int cameraId, const QString& data); // 新增：处理检测数据（含摄像头ID）
     QTcpServer* tcpServer;             // TCP服务器对象

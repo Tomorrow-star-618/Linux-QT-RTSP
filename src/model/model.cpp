@@ -83,7 +83,7 @@ int Model::findVideoStream(AVFormatContext* fmt_ctx) {
 // 打开解码器，获取AVCodecContext
 bool Model::openDecoder(AVFormatContext* fmt_ctx, int videoStream, AVCodecContext*& codec_ctx) {
     AVCodecParameters* codecpar = fmt_ctx->streams[videoStream]->codecpar;
-    AVCodec* codec = avcodec_find_decoder(codecpar->codec_id); // 查找解码器
+    const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id); // 查找解码器
     codec_ctx = avcodec_alloc_context3(codec);                 // 分配解码器上下文
     avcodec_parameters_to_context(codec_ctx, codecpar);        // 拷贝参数
     if (avcodec_open2(codec_ctx, codec, nullptr) < 0) {        // 打开解码器
