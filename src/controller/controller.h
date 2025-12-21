@@ -63,6 +63,7 @@ private:
     DetectList* m_detectList = nullptr; // 对象检测列表窗口指针
     Plan* m_plan = nullptr; // 方案预选窗口指针
     QSet<int> m_selectedObjectIds; // 当前选中的对象ID集合
+    bool m_alarmSaveEnabled = false; // 报警自动保存开关状态
     
     // 功能按钮状态管理
     void updateButtonDependencies(int clickedButtonId, bool isChecked);

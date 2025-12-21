@@ -60,14 +60,52 @@ HEADERS += \
 FORMS += \
     $$VIEW_DIR/mainwindow.ui
 
-# FFmpeg 头文件路径 - 使用更合适的上级目录
-INCLUDEPATH += /usr/include/x86_64-linux-gnu
+# ============================================
+# 平台相关配置
+# ============================================
 
-# FFmpeg 库文件路径
-LIBS += -L/usr/lib/x86_64-linux-gnu
+# Windows 平台配置
+win32 {
+    # FFmpeg 路径配置 - 使用系统安装的完整版 FFmpeg
+    FFMPEG_PATH = D:/Qt/ffmpeg-7.1.1-full_build-shared
+    
+    # FFmpeg 头文件路径
+    INCLUDEPATH += $$FFMPEG_PATH/include
+    
+    # FFmpeg 库文件路径
+    LIBS += -L$$FFMPEG_PATH/lib
+    
+    # 链接 FFmpeg 的库 (Windows 使用 .lib 或直接链接 .dll)
+    LIBS += -lavcodec \
+            -lavformat \
+            -lavutil \
+            -lswscale \
+            -lavdevice \
+            -lswresample \
+            -lavfilter \
+            -lpostproc
+    
+    # 自动复制 FFmpeg DLL 到编译输出目录
+    FFMPEG_DLLS = $$FFMPEG_PATH/bin/*.dll
+    FFMPEG_DLLS ~= s,/,\\,g  # 将路径分隔符转换为 Windows 格式
+    DESTDIR_WIN = $$OUT_PWD
+    DESTDIR_WIN ~= s,/,\\,g
+    
+    # 使用 QMAKE_POST_LINK 在编译后自动复制 DLL
+    QMAKE_POST_LINK += xcopy /Y /D \"$$FFMPEG_DLLS\" \"$$DESTDIR_WIN\" $$escape_expand(\\n\\t)
+}
 
-# 链接 FFmpeg 的库
-LIBS += -lavcodec -lavformat -lavutil -lswscale
+# Linux 平台配置
+unix:!macx {
+    # FFmpeg 头文件路径 - 使用更合适的上级目录
+    INCLUDEPATH += /usr/include/x86_64-linux-gnu
+    
+    # FFmpeg 库文件路径
+    LIBS += -L/usr/lib/x86_64-linux-gnu
+    
+    # 链接 FFmpeg 的库
+    LIBS += -lavcodec -lavformat -lavutil -lswscale
+}
 
 ## OpenCV 头文件路径
 #INCLUDEPATH += /usr/include/opencv4

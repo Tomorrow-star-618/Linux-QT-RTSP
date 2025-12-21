@@ -202,15 +202,16 @@ void View::initFunButtons()
         }
     )");
 
-    // 功能按钮文本 (新增第五个普通按钮: 方案预选)
-    QStringList btnNames = {"AI功能", "区域识别", "对象识别", "对象列表", "方案预选"};
+    // 功能按钮文本 (新增第六个可选按钮: 报警保存)
+    QStringList btnNames = {"AI功能", "区域识别", "对象识别", "对象列表", "方案预选", "报警保存"};
     // 图标路径(临时复用 对象列表 图标)
     QStringList tabIconPaths = {
         ":icon/AI.png",
         ":icon/rect.png",
         ":icon/object.png",
         ":icon/list.png",
-        ":icon/list.png" // 方案预选 暂用
+        ":icon/list.png", // 方案预选 暂用
+        ":icon/AI.png"    // 报警保存 暂用 (可以后续替换为专用图标)
     };
 
     // 功能按钮样式
@@ -254,8 +255,8 @@ void View::initFunButtons()
         btn->setIconSize(QSize(32, 32));                             // 设置图标大小
         btn->setLayoutDirection(Qt::LeftToRight);                    // 图标在左，文字在右
         // 设置按钮的可选属性
-        if (i < 3) {
-            // 前三个按钮（AI功能、区域识别、对象识别）为可选按钮
+        if (i < 3 || i == 5) {
+            // 前三个按钮（AI功能、区域识别、对象识别）和第六个按钮（报警保存）为可选按钮
             btn->setCheckable(true);
             btn->setChecked(false);
         } else {

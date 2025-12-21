@@ -149,6 +149,12 @@ void Controller::saveImage()
 
 void Controller::saveAlarmImage(int cameraId, const QString& detectionInfo)
 {
+    // 检查报警保存功能是否开启
+    if (!m_alarmSaveEnabled) {
+        qDebug() << "报警保存功能未开启，跳过保存图片";
+        return;
+    }
+    
     // 根据摄像头ID获取对应的流图像
     QImage imageToSave;
     
@@ -630,6 +636,26 @@ void Controller::FunButtonClickedHandler()
             m_plan->show();
             m_plan->raise();
             m_plan->activateWindow();
+        }
+        break;
+
+    case 5: // 报警保存
+        qDebug() << "报警保存按钮被点击";
+        {
+            m_alarmSaveEnabled = isChecked;
+            
+            if (isChecked) {
+                qDebug() << "报警自动保存已开启";
+                QMessageBox::information(m_view, "报警保存", 
+                    "报警自动保存功能已开启！\n\n"
+                    "当检测到目标时，系统将自动保存报警图片到：\n"
+                    "picture/alarm-picture/ 目录");
+                m_view->addEventMessage("success", "报警自动保存功能已开启！");
+            } else {
+                qDebug() << "报警自动保存已关闭";
+                QMessageBox::information(m_view, "报警保存", "报警自动保存功能已关闭！");
+                m_view->addEventMessage("info", "报警自动保存功能已关闭！");
+            }
         }
         break;
 

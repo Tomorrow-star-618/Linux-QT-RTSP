@@ -27,7 +27,9 @@ Tcpserver::Tcpserver(QWidget* parent)
     comboBox->setFixedWidth(80); // 设置宽度为80
     comboBox->addItem("all"); // 初始添加all选项
     
-    Ip_lineEdit = new QLineEdit("192.168.1.156");  
+    // 自动获取本机IP地址
+    QString localIp = getLocalIPAddress();
+    Ip_lineEdit = new QLineEdit(localIp);  
     Sent_lineEdit = new QLineEdit("TCPserver_sent_info");
 
     spinBox = new QSpinBox();
@@ -80,6 +82,69 @@ Tcpserver::Tcpserver(QWidget* parent)
 
 Tcpserver::~Tcpserver() {
     stopListen();
+}
+
+// 获取本机首选的IPv4地址（排除回环地址）
+QString Tcpserver::getLocalIPAddress()
+{
+    // 获取所有网络接口
+    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    
+    QString preferredIp;
+    QString fallbackIp;
+    
+    // 遍历每个网络接口
+    foreach (QNetworkInterface interface, interfaces) {
+        // 跳过未启用或回环接口
+        if (!(interface.flags() & QNetworkInterface::IsUp) ||
+            !(interface.flags() & QNetworkInterface::IsRunning) ||
+            (interface.flags() & QNetworkInterface::IsLoopBack)) {
+            continue;
+        }
+        
+        // 获取该接口的所有地址条目
+        QList<QNetworkAddressEntry> entries = interface.addressEntries();
+        foreach (QNetworkAddressEntry entry, entries) {
+            QHostAddress ip = entry.ip();
+            
+            // 只处理IPv4地址
+            if (ip.protocol() == QAbstractSocket::IPv4Protocol) {
+                QString ipStr = ip.toString();
+                
+                // 跳过回环地址 127.x.x.x
+                if (ipStr.startsWith("127.")) {
+                    continue;
+                }
+                
+                // 优先选择192.168.x.x或10.x.x.x或172.16-31.x.x（局域网地址）
+                if (ipStr.startsWith("192.168.") || 
+                    ipStr.startsWith("10.") ||
+                    (ipStr.startsWith("172.") && 
+                     ipStr.section('.', 1, 1).toInt() >= 16 && 
+                     ipStr.section('.', 1, 1).toInt() <= 31)) {
+                    
+                    // 如果还没有选定IP，或者当前IP是以太网接口（优先于WiFi）
+                    if (preferredIp.isEmpty() || 
+                        interface.humanReadableName().contains("Ethernet", Qt::CaseInsensitive) ||
+                        interface.humanReadableName().contains("以太网", Qt::CaseInsensitive)) {
+                        preferredIp = ipStr;
+                    }
+                } else if (fallbackIp.isEmpty()) {
+                    // 其他公网IP作为备选
+                    fallbackIp = ipStr;
+                }
+            }
+        }
+    }
+    
+    // 返回优先IP，如果没有则返回备选IP，都没有则返回localhost
+    if (!preferredIp.isEmpty()) {
+        return preferredIp;
+    } else if (!fallbackIp.isEmpty()) {
+        return fallbackIp;
+    } else {
+        return "127.0.0.1";
+    }
 }
 
 // 获取本地主机的所有IPv4地址，并将其添加到下拉框和IP列表中
