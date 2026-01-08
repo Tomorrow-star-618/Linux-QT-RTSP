@@ -32,6 +32,8 @@ View::View(QWidget* parent)
 {  
     // 创建主水平布局
     QHBoxLayout* mainLayout = new QHBoxLayout(this);
+    mainLayout->setContentsMargins(3, 3, 3, 3);  // 减少主布局边距适配嵌入式屏幕
+    mainLayout->setSpacing(5);  // 减少主布局间距适配嵌入式屏幕
 
     // 初始化左边布局
     initleft();
@@ -89,10 +91,10 @@ void View::initleft()
 {
     // 创建左侧面板并应用垂直布局
     leftPanel = new QWidget();
-    leftPanel->setMinimumWidth(250); // 设置左侧面板最小宽度
-    leftPanel->setMaximumWidth(250); // 设置左侧面板最大宽度，避免过宽
+    leftPanel->setMinimumWidth(200); // 减少左侧面板宽度适配嵌入式屏幕
+    leftPanel->setMaximumWidth(200); // 减少左侧面板宽度适配嵌入式屏幕
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
-    leftLayout->setContentsMargins(5, 20, 5, 5); // 设置边距：左、上、右、下
+    leftLayout->setContentsMargins(3, 10, 3, 3); // 设置边距：左、上、右、下
     
     // 创建事件消息框标签
     eventLabel = new QLabel("事件消息", leftPanel);
@@ -125,7 +127,7 @@ void View::initleft()
         "}"
     );
     eventBrowser->setMinimumHeight(200);
-    eventBrowser->setMinimumWidth(160); // 设置文本浏览器最小宽度
+    eventBrowser->setMinimumWidth(140); // 减少文本浏览器宽度适配嵌入式屏幕
     
     
     // 将控件添加到左侧布局
@@ -139,6 +141,8 @@ void View::initmiddle()
     // 创建中间面板并应用垂直布局
     middlePanel = new QWidget();
     QVBoxLayout *middleLayout = new QVBoxLayout(middlePanel);
+    middleLayout->setContentsMargins(3, 3, 3, 3); // 减少边距适配嵌入式屏幕
+    middleLayout->setSpacing(3); // 减少间距适配嵌入式屏幕
 
     // 初始化功能按钮面板
     initFunButtons();
@@ -168,8 +172,8 @@ void View::initright()
 {
     // 创建右侧面板并应用垂直布局
     rightPanel = new QWidget();
-    rightPanel->setMinimumWidth(250); // 设置右侧面板最小宽度，与左侧保持一致
-    rightPanel->setMaximumWidth(250); // 设置右侧面板最大宽度，避免过宽
+    rightPanel->setMinimumWidth(200); // 减少右侧面板宽度适配嵌入式屏幕
+    rightPanel->setMaximumWidth(200); // 减少右侧面板宽度适配嵌入式屏幕
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
 
     // 初始化右侧按钮面板
@@ -192,6 +196,8 @@ void View::initFunButtons()
     // 创建水平布局
     funPanel = new QWidget();
     QHBoxLayout* funLayout = new QHBoxLayout(funPanel);
+    funLayout->setContentsMargins(3, 3, 3, 3); // 减少边距适配嵌入式屏幕
+    funLayout->setSpacing(3); // 减少按钮间距适配嵌入式屏幕
 
     // 设置功能面板样式
     funPanel->setStyleSheet(R"(
@@ -214,7 +220,7 @@ void View::initFunButtons()
         ":icon/AI.png"    // 报警保存 暂用 (可以后续替换为专用图标)
     };
 
-    // 功能按钮样式
+    // 功能按钮样式 - 减少padding适配嵌入式屏幕
     QString funBtnStyle = R"(
         QPushButton {
             font-family: "Microsoft YaHei";
@@ -223,10 +229,8 @@ void View::initFunButtons()
             background: #4CAF50;
             color: white;
             border: 2px solid #45a049;
-            border-radius: 8px;
-            padding: 8px 16px;
-            min-width: 80px;
-            min-height: 20px;
+            border-radius: 6px;
+            padding: 4px 8px;
         }
         QPushButton:hover {
             background: #45a049;
@@ -252,7 +256,7 @@ void View::initFunButtons()
         btn->setStyleSheet(funBtnStyle); // 应用按钮样式
         btn->setProperty("ButtonID", i); // 设置自定义属性用于区分按钮
         btn->setIcon(QIcon(tabIconPaths[i]));                        // 设置按钮图标
-        btn->setIconSize(QSize(32, 32));                             // 设置图标大小
+        btn->setIconSize(QSize(24, 24));                             // 减少图标大小适配嵌入式屏幕
         btn->setLayoutDirection(Qt::LeftToRight);                    // 图标在左，文字在右
         // 设置按钮的可选属性
         if (i < 3 || i == 5) {
@@ -321,8 +325,8 @@ void View::initButtons()
     for (int i = 0; i < tabIconPaths.size(); ++i) {
         QPushButton* btn = new QPushButton(tabNames[i], buttonPanel); // 创建按钮并设置文字
         btn->setIcon(QIcon(tabIconPaths[i]));                        // 设置按钮图标
-        btn->setIconSize(QSize(32, 32));                             // 设置图标大小
-        btn->setMinimumSize(80, 40);                                 // 设置按钮最小尺寸
+        btn->setIconSize(QSize(28, 28));                             // 减少图标大小适配嵌入式屏幕
+        btn->setMinimumSize(70, 35);                                 // 减少按钮最小尺寸适配嵌入式屏幕
         btn->setProperty("ButtonID", i);                             // 设置自定义属性用于区分按钮
         btn->setLayoutDirection(Qt::LeftToRight);                    // 图标在左，文字在右
         buttonLayout->addWidget(btn);                                // 将按钮添加到布局中
@@ -361,8 +365,8 @@ void View::initservo()
         // 设置图标
         QIcon icon(iconPaths[i]);
         btn->setIcon(icon);
-        btn->setIconSize(QSize(32, 32)); // 设置图标大小
-        btn->setMinimumSize(30, 30);     // 设置按钮最小尺寸
+        btn->setIconSize(QSize(28, 28)); // 减少图标大小适配嵌入式屏幕
+        btn->setMinimumSize(28, 28);     // 减少按钮最小尺寸适配嵌入式屏幕
 
         ServoButtons << btn;
     }
@@ -673,25 +677,25 @@ void View::initMultiStreamControl()
 {
     // 创建多路视频流控制面板
     multiStreamPanel = new QWidget();
-    multiStreamPanel->setMaximumHeight(80);
+    multiStreamPanel->setMaximumHeight(70); // 减少高度适配嵌入式屏幕
     multiStreamPanel->setStyleSheet(R"(
         QWidget {
             background-color: #f5f5f5;
             border: 1px solid #cccccc;
-            border-radius: 5px;
+            border-radius: 4px;
         }
     )");
     
     QHBoxLayout* mainLayout = new QHBoxLayout(multiStreamPanel);
-    mainLayout->setContentsMargins(10, 5, 10, 5);
-    mainLayout->setSpacing(10);
+    mainLayout->setContentsMargins(2, 2, 2, 2); // 进一步减少边距
+    mainLayout->setSpacing(3); // 进一步减少间距
     
     // ========== 左侧：布局切换按钮 ==========
-    QLabel* layoutLabel = new QLabel("视频布局:", multiStreamPanel);
+    QLabel* layoutLabel = new QLabel("布局:", multiStreamPanel); // 简化文字
     layoutLabel->setStyleSheet(R"(
         QLabel {
             font-family: "Microsoft YaHei";
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             color: #333333;
             background: transparent;
@@ -707,21 +711,21 @@ void View::initMultiStreamControl()
     layoutBtnLayout->setContentsMargins(0, 0, 0, 0);
     layoutBtnLayout->setSpacing(2); // 按钮之间用虚线隔离，间距设小一点
     
-    // 布局按钮样式（缩小按钮尺寸）
+    // 布局按钮样式（进一步缩小按钮尺寸适配嵌入式屏幕）
     QString layoutBtnStyle = R"(
         QPushButton {
             font-family: "Microsoft YaHei";
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                        stop:0 #ffffff, stop:1 #e8e8e8);
             color: #333333;
-            border: 2px solid #999999;
-            border-radius: 5px;
-            padding: 6px 10px;
-            min-width: 45px;
-            min-height: 30px;
-            max-width: 50px;
+            border: 1px solid #999999;
+            border-radius: 4px;
+            padding: 4px 6px;
+            min-width: 35px;
+            min-height: 26px;
+            max-width: 40px;
         }
         QPushButton:hover {
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -798,22 +802,22 @@ void View::initMultiStreamControl()
     mainLayout->addWidget(layoutBtnWidget);
     
     // 添加间距
-    mainLayout->addSpacing(20);
+    mainLayout->addSpacing(5); // 减少间距
     
     // ========== 添加选中视频流显示标签 ==========
     selectedStreamLabel = new QLabel("未选中", multiStreamPanel);
     selectedStreamLabel->setStyleSheet(R"(
         QLabel {
             font-family: "Microsoft YaHei";
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             color: #0078d4;
             background: #e7f3ff;
-            border: 2px solid #0078d4;
-            border-radius: 4px;
-            padding: 4px 12px;
-            min-width: 80px;
-            max-width: 100px;
+            border: 1px solid #0078d4;
+            border-radius: 3px;
+            padding: 3px 8px;
+            min-width: 60px;
+            max-width: 80px;
         }
     )");
     selectedStreamLabel->setAlignment(Qt::AlignCenter);
@@ -823,11 +827,11 @@ void View::initMultiStreamControl()
     mainLayout->addStretch();
     
     // ========== 右侧：视频流选择 ==========
-    QLabel* streamLabel = new QLabel("放大显示:", multiStreamPanel);
+    QLabel* streamLabel = new QLabel("放大:", multiStreamPanel); // 简化文字
     streamLabel->setStyleSheet(R"(
         QLabel {
             font-family: "Microsoft YaHei";
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             color: #333333;
             background: transparent;
@@ -841,34 +845,34 @@ void View::initMultiStreamControl()
     streamSelectCombox->setStyleSheet(R"(
         QComboBox {
             font-family: "Microsoft YaHei";
-            font-size: 13px;
+            font-size: 12px;
             background: white;
-            border: 2px solid #999999;
-            border-radius: 5px;
-            padding: 5px 10px;
-            min-width: 150px;
-            min-height: 30px;
+            border: 1px solid #999999;
+            border-radius: 4px;
+            padding: 4px 8px;
+            min-width: 120px;
+            min-height: 26px;
         }
         QComboBox:hover {
             border-color: #4a90e2;
         }
         QComboBox::drop-down {
             border: none;
-            width: 25px;
+            width: 20px;
         }
         QComboBox::down-arrow {
             image: none;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 5px solid #666666;
-            margin-right: 5px;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid #666666;
+            margin-right: 4px;
         }
         QComboBox QAbstractItemView {
             background: white;
-            border: 2px solid #4a90e2;
+            border: 1px solid #4a90e2;
             selection-background-color: #4a90e2;
             selection-color: white;
-            font-size: 13px;
+            font-size: 12px;
         }
     )");
     
@@ -899,12 +903,12 @@ void View::initVideoContainer()
     videoContainer->setStyleSheet("background-color: #0a0a0a;");
     
     videoGridLayout = new QGridLayout(videoContainer);
-    videoGridLayout->setSpacing(12); // 增加间距到12px，让虚线边框更明显
-    videoGridLayout->setContentsMargins(12, 12, 12, 12);
+    videoGridLayout->setSpacing(4); // 减少间距适配嵌入式屏幕
+    videoGridLayout->setContentsMargins(4, 4, 4, 4);
     
     // 创建用于绘框功能的videoLabel（只在需要时使用）
     videoLabel = new VideoLabel(videoContainer);
-    videoLabel->setMinimumWidth(520);
+    videoLabel->setMinimumWidth(320); // 减少最小宽度适配嵌入式屏幕
     videoLabel->setAlignment(Qt::AlignCenter);
     videoLabel->setStyleSheet("background-color: #2d2d2d; color: white; font-size: 20px;");
     videoLabel->setText("未添加信号源");
@@ -941,7 +945,7 @@ void View::addVideoStream(int streamId, const QString& name, int cameraId)
     
     // 创建新的VideoLabel
     VideoLabel* label = new VideoLabel(videoContainer);
-    label->setMinimumSize(100, 75); // 设置最小尺寸，保持4:3比例
+    label->setMinimumSize(80, 60); // 减少最小尺寸适配嵌入式屏幕，保持4:3比例
     label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding); // 自动扩展填充
     label->setAlignment(Qt::AlignCenter);
     label->setScaledContents(false); // 不自动缩放内容，保持比例
@@ -1274,7 +1278,7 @@ void View::updateVideoLayout()
         } else {
             // 没有视频流，创建占位符（使用VideoLabel以支持悬停控制条）
             VideoLabel* placeholder = new VideoLabel(videoContainer);
-            placeholder->setMinimumSize(100, 75); // 设置最小尺寸，保持4:3比例
+            placeholder->setMinimumSize(80, 60); // 减少最小尺寸适配嵌入式屏幕，保持4:3比例
             placeholder->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding); // 自动扩展填充
             placeholder->setAlignment(Qt::AlignCenter);
             placeholder->setStyleSheet(R"(

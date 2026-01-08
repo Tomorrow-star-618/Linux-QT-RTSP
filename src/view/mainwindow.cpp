@@ -11,7 +11,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_tcpServer(nullptr)
 {
     // 设置主窗口大小为1200x720
-    this->resize(1300, 650);
+    this->resize(900, 550);
     
     // 设置窗口图标
     this->setWindowIcon(QIcon(":icon/lmx.png"));
