@@ -51,6 +51,7 @@ Controller::Controller(Model* model, View* view, QObject* parent)
     connect(m_view, &View::streamSelected, this, &Controller::onStreamSelected);
     connect(m_view, &View::streamPauseRequested, this, &Controller::onStreamPauseRequested);
     connect(m_view, &View::streamScreenshotRequested, this, &Controller::onStreamScreenshotRequested);
+    connect(m_view, &View::streamRemoveRequested, this, &Controller::removeVideoStream);
     connect(m_view, &View::addCameraWithIdRequested, this, &Controller::onAddCameraWithIdRequested);
 
     // 如果稍后设置tcpWin，也会在setTcpServer中再连接
@@ -67,7 +68,12 @@ Controller::~Controller()
     
     // 清理主视频流
     m_model->stopStream();
-    m_model->wait();
+    // 使用带超时的wait，避免无限阻塞
+    if (!m_model->wait(500)) {
+        qWarning() << "主视频流线程未能在500ms内正常退出，强制终止";
+        m_model->terminate();
+        m_model->wait(100);
+    }
 }
 
 void Controller::setTcpServer(Tcpserver* tcpServer)
@@ -1106,14 +1112,31 @@ void Controller::removeVideoStream(int streamId)
         return;
     }
     
-    // 停止并删除Model
+    // 获取该流对应的摄像头ID
+    int cameraId = m_view->getCameraIdForStream(streamId);
+    
+    // 如果有对应的摄像头ID且TCP服务器已连接,发送停止推流信号
+    if (cameraId > 0 && tcpWin && tcpWin->hasConnectedClients()) {
+        tcpWin->Tcp_sent_info(cameraId, DEVICE_CAMERA, RTSP_ENABLE, 0);
+        qDebug() << "已发送TCP信号停止摄像头" << cameraId << "的推流";
+    }
+    
+    // 先从View中移除（立即更新界面）
+    m_view->removeVideoStream(streamId);
+    
+    // 停止Model（异步处理，避免界面卡死）
     Model* model = m_streamModels.take(streamId);
     model->stopStream();
-    model->wait();
-    model->deleteLater();
     
-    // 从View中移除
-    m_view->removeVideoStream(streamId);
+    // 使用带超时的wait，避免无限阻塞主线程
+    // 最多等待500ms，如果线程未结束则强制退出
+    if (!model->wait(500)) {
+        qWarning() << "视频流" << streamId << "线程未能在500ms内正常退出，强制终止";
+        model->terminate(); // 强制终止线程
+        model->wait(100);   // 等待terminate完成
+    }
+    
+    model->deleteLater();
     
     // 记录日志
     qDebug() << "删除视频流:" << streamId;
@@ -1128,7 +1151,12 @@ void Controller::clearAllStreams()
     for (auto it = m_streamModels.begin(); it != m_streamModels.end(); ++it) {
         Model* model = it.value();
         model->stopStream();
-        model->wait();
+        // 使用带超时的wait，避免无限阻塞
+        if (!model->wait(500)) {
+            qWarning() << "视频流线程未能在500ms内正常退出，强制终止";
+            model->terminate();
+            model->wait(100);
+        }
         model->deleteLater();
     }
     m_streamModels.clear();

@@ -1,4 +1,10 @@
 #include "model.h"
+#include "FFmpegDecoder.h"
+#include <QDateTime>
+
+#ifdef PLATFORM_RK3576
+#include "MppDecoder.h"
+#endif
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -80,54 +86,44 @@ int Model::findVideoStream(AVFormatContext* fmt_ctx) {
     return -1; // 未找到视频流
 }
 
-// 打开解码器，获取AVCodecContext
-bool Model::openDecoder(AVFormatContext* fmt_ctx, int videoStream, AVCodecContext*& codec_ctx) {
+// 创建解码器（自动选择硬解或软解）
+IVideoDecoder* Model::createDecoder()
+{
+#ifdef PLATFORM_RK3576
+    qDebug() << "Model: 使用 MPP 硬件解码器";
+    return new MppDecoder();
+#else
+    qDebug() << "Model: 使用 FFmpeg 软件解码器";
+    return new FFmpegDecoder();
+#endif
+}
+
+// 打开解码器
+bool Model::openDecoder(AVFormatContext* fmt_ctx, int videoStream, IVideoDecoder*& decoder) {
     AVCodecParameters* codecpar = fmt_ctx->streams[videoStream]->codecpar;
-    const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id); // 查找解码器
-    codec_ctx = avcodec_alloc_context3(codec);                 // 分配解码器上下文
-    avcodec_parameters_to_context(codec_ctx, codecpar);        // 拷贝参数
-    if (avcodec_open2(codec_ctx, codec, nullptr) < 0) {        // 打开解码器
-        avcodec_free_context(&codec_ctx);
+    
+    decoder = createDecoder();
+    if (!decoder) {
+        qWarning() << "Model: 创建解码器失败";
         return false;
     }
+    
+    if (!decoder->init(codecpar)) {
+        qWarning() << "Model: 初始化解码器失败";
+        delete decoder;
+        decoder = nullptr;
+        return false;
+    }
+    
     return true;
 }
 
 // 读取并解码视频帧，转换为QImage并发送信号
-void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_ctx, int videoStream) {
-    AVFrame* frame = av_frame_alloc();      // 原始帧
-    AVFrame* rgbFrame = av_frame_alloc();   // RGB帧
-    
-    // 检查帧分配是否成功
-    if (!frame || !rgbFrame) {
-        if (frame) av_frame_free(&frame);
-        if (rgbFrame) av_frame_free(&rgbFrame);
-        return;
-    }
-    
-    // 创建图像转换上下文
-    SwsContext* sws_ctx = sws_getContext(codec_ctx->width, codec_ctx->height, codec_ctx->pix_fmt,
-                                         codec_ctx->width, codec_ctx->height, AV_PIX_FMT_RGB24,
-                                         SWS_BILINEAR, nullptr, nullptr, nullptr);
-    if (!sws_ctx) {
-        av_frame_free(&frame);
-        av_frame_free(&rgbFrame);
-        return;
-    }
-    
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, codec_ctx->width, codec_ctx->height, 1);
-    uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // 分配RGB缓冲区
-    if (!buffer) {
-        av_frame_free(&frame);
-        av_frame_free(&rgbFrame);
-        sws_freeContext(sws_ctx);
-        return;
-    }
-    
-    av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer, AV_PIX_FMT_RGB24,
-                        codec_ctx->width, codec_ctx->height, 1);
+void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, IVideoDecoder* decoder, int videoStream) {
     AVPacket pkt;
     int readResult = 0;
+    int frameCount = 0;
+    qint64 startTime = QDateTime::currentMSecsSinceEpoch();
     
     // 读取视频帧主循环
     while (!m_stop) {
@@ -154,16 +150,20 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_
         
         if (pkt.stream_index == videoStream) {
             // 发送包到解码器
-            if (avcodec_send_packet(codec_ctx, &pkt) == 0) {
+            if (decoder->sendPacket(&pkt)) {
                 // 接收解码帧
-                while (avcodec_receive_frame(codec_ctx, frame) == 0) {
-                    // 转换为RGB格式
-                    sws_scale(sws_ctx, frame->data, frame->linesize, 0, codec_ctx->height,
-                              rgbFrame->data, rgbFrame->linesize);
-                    // 构造QImage并发送信号
-                    QImage img(rgbFrame->data[0], codec_ctx->width, codec_ctx->height,
-                               rgbFrame->linesize[0], QImage::Format_RGB888);
-                    emit frameReady(img.copy());
+                QImage img;
+                while (decoder->receiveFrame(img)) {
+                    emit frameReady(img);
+                    frameCount++;
+                    
+                    // 每100帧统计一次帧率
+                    if (frameCount % 100 == 0) {
+                        qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+                        qint64 elapsed = currentTime - startTime;
+                        double fps = (frameCount * 1000.0) / elapsed;
+                        qDebug() << "解码帧率:" << QString::number(fps, 'f', 2) << "fps，已解码" << frameCount << "帧";
+                    }
                 }
             }
         }
@@ -176,22 +176,17 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_
         }
         m_mutex.unlock();
     }
-    
-    // 释放帧和转换上下文等资源（注意：不在这里释放fmt_ctx和codec_ctx）
-    if (buffer) av_free(buffer);
-    if (rgbFrame) av_frame_free(&rgbFrame);
-    if (frame) av_frame_free(&frame);
-    if (sws_ctx) sws_freeContext(sws_ctx);
 }
 
 // 释放所有相关资源
-void Model::cleanup(AVFormatContext* fmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVFrame* rgbFrame, uint8_t* buffer, SwsContext* sws_ctx) {
-    if (buffer) av_free(buffer);           // 释放RGB缓冲区
-    if (rgbFrame) av_frame_free(&rgbFrame);// 释放RGB帧
-    if (frame) av_frame_free(&frame);      // 释放原始帧
-    if (codec_ctx) avcodec_free_context(&codec_ctx); // 释放解码器上下文
-    if (fmt_ctx) avformat_close_input(&fmt_ctx);     // 关闭输入流
-    if (sws_ctx) sws_freeContext(sws_ctx);           // 释放图像转换上下文
+void Model::cleanup(AVFormatContext* fmt_ctx, IVideoDecoder* decoder) {
+    if (decoder) {
+        decoder->cleanup();
+        delete decoder;
+    }
+    if (fmt_ctx) {
+        avformat_close_input(&fmt_ctx);
+    }
 }
 
 // 主线程函数，负责整体流程调度
@@ -214,25 +209,24 @@ void Model::run()
         // 查找视频流索引
         int videoStream = findVideoStream(fmt_ctx);
         if (videoStream == -1) {
-            cleanup(fmt_ctx, nullptr, nullptr, nullptr, nullptr, nullptr);
+            cleanup(fmt_ctx, nullptr);
             emit frameReady(QImage());
             QThread::msleep(1000);
             continue;
         }
         // 打开解码器
-        AVCodecContext* codec_ctx = nullptr;
-        if (!openDecoder(fmt_ctx, videoStream, codec_ctx)) {
-            cleanup(fmt_ctx, codec_ctx, nullptr, nullptr, nullptr, nullptr);
+        IVideoDecoder* decoder = nullptr;
+        if (!openDecoder(fmt_ctx, videoStream, decoder)) {
+            cleanup(fmt_ctx, decoder);
             emit frameReady(QImage());
             QThread::msleep(1000);
             continue;
         }
         // 读取并解码帧
-        readAndDecodeFrames(fmt_ctx, codec_ctx, videoStream);
+        readAndDecodeFrames(fmt_ctx, decoder, videoStream);
         
-        // 释放资源（fmt_ctx和codec_ctx在这里释放）
-        if (codec_ctx) avcodec_free_context(&codec_ctx);
-        if (fmt_ctx) avformat_close_input(&fmt_ctx);
+        // 释放资源
+        cleanup(fmt_ctx, decoder);
         
         // 检查是否需要停止
         m_mutex.lock();

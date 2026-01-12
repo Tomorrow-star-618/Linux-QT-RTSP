@@ -67,6 +67,7 @@ signals:
     void streamSelected(int streamId); // 视频流选中信号
     void streamPauseRequested(int streamId); // 请求暂停流
     void streamScreenshotRequested(int streamId); // 请求截图流
+    void streamRemoveRequested(int streamId); // 请求删除流
     void addCameraWithIdRequested(int cameraId); // 请求添加指定ID的摄像头
 
 private slots:

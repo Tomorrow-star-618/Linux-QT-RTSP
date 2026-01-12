@@ -986,7 +986,7 @@ void View::addVideoStream(int streamId, const QString& name, int cameraId)
     });
     connect(label, &VideoLabel::closeStreamClicked, this, [this](int sid) {
         qDebug() << "悬停控制条：请求关闭流（ID:" << sid << "）";
-        removeVideoStream(sid);
+        emit streamRemoveRequested(sid); // 发射信号通知Controller处理
     });
     
     // 连接双击选中信号

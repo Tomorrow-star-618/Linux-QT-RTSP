@@ -4,6 +4,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
+#include "IVideoDecoder.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -37,12 +38,15 @@ private:
     bool openStream(const QString& url, AVFormatContext*& fmt_ctx);
     // 查找视频流索引
     int findVideoStream(AVFormatContext* fmt_ctx);
-    // 打开解码器，获取AVCodecContext
-    bool openDecoder(AVFormatContext* fmt_ctx, int videoStream, AVCodecContext*& codec_ctx);
+    // 创建解码器（自动选择硬解或软解）
+    IVideoDecoder* createDecoder();
+    // 打开解码器
+    bool openDecoder(AVFormatContext* fmt_ctx, int videoStream, IVideoDecoder*& decoder);
     // 读取并解码视频帧，转换为QImage并发送信号
-    void readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_ctx, int videoStream);
+    void readAndDecodeFrames(AVFormatContext* fmt_ctx, IVideoDecoder* decoder, int videoStream);
     // 释放所有相关资源
-    void cleanup(AVFormatContext* fmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVFrame* rgbFrame, uint8_t* buffer, SwsContext* sws_ctx);
+    void cleanup(AVFormatContext* fmt_ctx, IVideoDecoder* decoder);
+    
     QString m_url;             // RTSP流地址
     bool m_stop;               // 停止标志
     bool m_pause = false;      // 暂停标志
