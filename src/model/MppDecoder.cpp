@@ -21,8 +21,6 @@ MppDecoder::MppDecoder()
     if (rgaRet != 0) {
         qWarning() << "MppDecoder: RGA 初始化失败，将使用 CPU 转换" << rgaRet;
         m_useRGA = false;
-    } else {
-        qDebug() << "MppDecoder: ✓ RGA 硬件加速已启用";
     }
 }
 
@@ -33,15 +31,12 @@ MppDecoder::~MppDecoder()
     // 释放 RGA 资源
     if (m_useRGA) {
         c_RkRgaDeInit();
-        qDebug() << "MppDecoder: RGA 资源已释放";
     }
 }
 
 bool MppDecoder::init(AVCodecParameters* codecpar)
 {
     MPP_RET ret = MPP_OK;
-    
-    qDebug() << "MppDecoder: 初始化硬件解码器...";
     
     // 创建 MPP 上下文
     ret = mpp_create(&m_mppCtx, &m_mppApi);
@@ -99,9 +94,7 @@ bool MppDecoder::init(AVCodecParameters* codecpar)
         MPP_RET ret = mpp_buffer_get(m_frmGrp, &m_rgbMppBuffer, m_rgbBufferSize);
         if (ret == MPP_OK) {
             m_rgbBuffer = (uint8_t*)mpp_buffer_get_ptr(m_rgbMppBuffer);
-            qDebug() << "MppDecoder: 分配 RGA 输出缓冲区成功";
         } else {
-            qWarning() << "MppDecoder: 分配 MPP buffer 失败，回退到普通缓冲区";
             m_rgbBuffer = new uint8_t[m_rgbBufferSize];
             m_useRGA = false;
         }
@@ -116,8 +109,6 @@ bool MppDecoder::init(AVCodecParameters* codecpar)
     }
     
     m_initialized = true;
-    qDebug() << "MppDecoder: ✓ 硬件解码器初始化成功" << m_width << "x" << m_height 
-             << (m_useRGA ? "(使用 RGA 加速)" : "(使用 CPU 转换)");
     return true;
 }
 
@@ -200,8 +191,6 @@ bool MppDecoder::receiveFrame(QImage& image)
             m_rgbBuffer = new uint8_t[m_rgbBufferSize];
         }
         
-        qDebug() << "MppDecoder: 分辨率变化" << m_width << "x" << m_height;
-        
         mpp_frame_deinit(&mppFrame);
         
         // 需要告诉 MPP 已经处理了 info_change
@@ -216,26 +205,13 @@ bool MppDecoder::receiveFrame(QImage& image)
         return false;
     }
     
-    // 检查帧错误标志 - 修改处理策略
+    // 检查帧错误标志
     RK_U32 errInfo = mpp_frame_get_errinfo(mppFrame);
-    RK_U32 discard = mpp_frame_get_discard(mppFrame);
     
     // 只在严重错误时才丢弃帧
     if (errInfo && (errInfo & MPP_FRAME_ERR_UNKNOW)) {
-        static int errorCount = 0;
-        if (++errorCount % 10 == 0) {
-            qWarning() << "MppDecoder: 严重帧错误，已丢弃" << errorCount << "帧";
-        }
         mpp_frame_deinit(&mppFrame);
         return false;
-    }
-    
-    // 轻微错误的帧仍然尝试转换显示
-    if (discard || errInfo) {
-        static int minorErrorCount = 0;
-        if (++minorErrorCount % 50 == 0) {
-            qDebug() << "MppDecoder: 轻微错误帧，继续处理 (已处理" << minorErrorCount << "个)";
-        }
     }
     
     // 转换 NV12 到 RGB - 优先使用 RGA 硬件加速
@@ -244,7 +220,6 @@ bool MppDecoder::receiveFrame(QImage& image)
         success = convertNV12ToRGBbyRGA(mppFrame, image);
         if (!success) {
             // RGA 失败时回退到 CPU
-            qWarning() << "MppDecoder: RGA 转换失败，回退到 CPU";
             m_useRGA = false;
             success = convertNV12ToRGBbyCPU(mppFrame, image);
         }
@@ -260,145 +235,56 @@ bool MppDecoder::receiveFrame(QImage& image)
 
 bool MppDecoder::convertNV12ToRGBbyRGA(MppFrame frame, QImage& image)
 {
-    static int callCount = 0;
-    static bool debugMode = true;  // 只在前几帧输出调试信息
-    callCount++;
-    
-    // 前5帧或失败时才输出详细调试信息
-    bool shouldDebug = (callCount <= 5) || !debugMode;
-    
     // 获取 MPP 帧缓冲区
     MppBuffer srcBuffer = mpp_frame_get_buffer(frame);
     if (!srcBuffer) {
-        qWarning() << "MppDecoder: [RGA调试] 步骤1失败 - 无法获取源缓冲区";
         return false;
     }
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试 #" << callCount << "] 步骤1✓ - 获取源缓冲区成功";
     
     int srcFd = mpp_buffer_get_fd(srcBuffer);
     int yStride = mpp_frame_get_hor_stride(frame);
     int yHeight = mpp_frame_get_ver_stride(frame);
     
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤2 - 源FD:" << srcFd << "stride:" << yStride << "height:" << yHeight;
-    
     // 验证参数合理性
-    if (srcFd < 0) {
-        qWarning() << "MppDecoder: [RGA调试] 步骤2失败 - RGA 源 FD 无效:" << srcFd;
+    if (srcFd < 0 || yStride < m_width || yHeight < m_height) {
         return false;
     }
-    
-    if (yStride < m_width || yHeight < m_height) {
-        qWarning() << "MppDecoder: [RGA调试] 步骤2失败 - stride参数异常 - stride:" << yStride << "height:" << yHeight 
-                   << "实际分辨率:" << m_width << "x" << m_height;
-        return false;
-    }
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤2✓ - 参数验证通过";
     
     // 配置 RGA 源信息（NV12 格式）
     rga_info_t src;
     memset(&src, 0, sizeof(rga_info_t));
     src.fd = srcFd;
-    src.mmuFlag = 1;  // 使用 MMU
-    
-    // 使用正确的 stride 和 height
-    int srcRet = rga_set_rect(&src.rect, 0, 0, m_width, m_height, yStride, yHeight, RK_FORMAT_YCbCr_420_SP);
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤3 - 源rect配置返回:" << srcRet;
+    src.mmuFlag = 1;
+    rga_set_rect(&src.rect, 0, 0, m_width, m_height, yStride, yHeight, RK_FORMAT_YCbCr_420_SP);
     
     // 配置 RGA 目标信息（RGB888 格式）
     rga_info_t dst;
     memset(&dst, 0, sizeof(rga_info_t));
     
-    // RGA wstride 是像素宽度，不是字节宽度
-    // 对于 RGB888，像素宽度需要 16 字节对齐 (即像素数对齐到 16)
-    int dstWStride = (m_width + 15) & ~15;  // 像素宽度对齐到 16
-    
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤4 - 目标wstride(像素):" << dstWStride << "(原始宽度:" << m_width << ")";
+    // RGA wstride 是像素宽度，需要 16 字节对齐
+    int dstWStride = (m_width + 15) & ~15;
     
     if (m_rgbMppBuffer) {
-        // 使用 MPP buffer（推荐，零拷贝）
         int dstFd = mpp_buffer_get_fd(m_rgbMppBuffer);
-        if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤4 - 使用MPP buffer, FD:" << dstFd;
-        
         if (dstFd < 0) {
-            qWarning() << "MppDecoder: [RGA调试] 步骤4失败 - RGA 目标 FD 无效:" << dstFd;
             return false;
         }
         dst.fd = dstFd;
         dst.mmuFlag = 1;
     } else {
-        // 使用虚拟地址
-        if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤4 - 使用虚拟地址:" << (void*)m_rgbBuffer;
         dst.virAddr = m_rgbBuffer;
         dst.mmuFlag = 1;
     }
     
-    int dstRet = rga_set_rect(&dst.rect, 0, 0, m_width, m_height, dstWStride, m_height, RK_FORMAT_RGB_888);
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤4✓ - 目标rect配置返回:" << dstRet;
+    rga_set_rect(&dst.rect, 0, 0, m_width, m_height, dstWStride, m_height, RK_FORMAT_RGB_888);
     
-    // 性能统计
-    static int frameCount = 0;
-    static qint64 lastTime = 0;
-    static bool firstCall = true;
-    frameCount++;
-    
-    // 首次调用时输出详细参数用于调试
-    if (firstCall) {
-        int dstFd = m_rgbMppBuffer ? mpp_buffer_get_fd(m_rgbMppBuffer) : -1;
-        qDebug() << "========================================";
-        qDebug() << "MppDecoder: [RGA 首次调用参数]";
-        qDebug() << "  源 FD:" << srcFd << "目标 FD:" << dstFd;
-        qDebug() << "  分辨率:" << m_width << "x" << m_height;
-        qDebug() << "  源 wstride(像素):" << yStride << "hstride:" << yHeight;
-        qDebug() << "  目标 wstride(像素):" << dstWStride << "hstride:" << m_height;
-        qDebug() << "  使用 MPP buffer:" << (m_rgbMppBuffer != nullptr);
-        qDebug() << "  源格式: RK_FORMAT_YCbCr_420_SP (0x" << QString::number(RK_FORMAT_YCbCr_420_SP, 16) << ")";
-        qDebug() << "  目标格式: RK_FORMAT_RGB_888 (0x" << QString::number(RK_FORMAT_RGB_888, 16) << ")";
-        qDebug() << "========================================";
-        firstCall = false;
-    }
-    
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤5 - 准备调用 c_RkRgaBlit...";
-    
-    // 执行 RGA 转换（硬件加速）
+    // 执行 RGA 转换
     int ret = c_RkRgaBlit(&src, &dst, nullptr);
-    
-    if (shouldDebug) qDebug() << "MppDecoder: [RGA调试] 步骤5 - c_RkRgaBlit 返回值:" << ret;
-    
     if (ret != 0) {
-        // 只在前5次失败时输出详细错误
-        if (callCount <= 5) {
-            qWarning() << "========================================";
-            qWarning() << "MppDecoder: [RGA调试] 步骤5失败 ❌ RGA 转换失败";
-            qWarning() << "  调用次数:" << callCount;
-            qWarning() << "  错误码:" << ret;
-            qWarning() << "  错误详情:";
-            qWarning() << "    -22 = EINVAL (无效参数)";
-            qWarning() << "    -1 = 一般错误";
-            qWarning() << "    0 = 成功";
-            qWarning() << "========================================";
-        }
-        debugMode = false;  // 失败后关闭详细调试
         return false;
     }
     
-    // 第5帧成功时输出成功消息
-    if (callCount == 5) {
-        qDebug() << "========================================";
-        qDebug() << "MppDecoder: ✅ RGA硬件转换连续成功! 关闭详细调试输出";
-        qDebug() << "========================================";
-    }
-    
-    // 每30帧统计一次性能
-    if (frameCount % 30 == 0) {
-        qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-        if (lastTime > 0) {
-            double fps = 30000.0 / (currentTime - lastTime);
-            qDebug() << "MppDecoder: [RGA 硬件] 转换帧率" << QString::number(fps, 'f', 2) << "fps";
-        }
-        lastTime = currentTime;
-    }
-    
-    // 创建 QImage - RGB888 每像素3字节，stride = wstride * 3
+    // 创建 QImage - RGB888 每像素3字节
     int bytesPerLine = dstWStride * 3;
     image = QImage(m_rgbBuffer, m_width, m_height, bytesPerLine, QImage::Format_RGB888).copy();
     
@@ -410,22 +296,17 @@ bool MppDecoder::convertNV12ToRGBbyCPU(MppFrame frame, QImage& image)
     // CPU 软件转换（备用方案）
     MppBuffer buffer = mpp_frame_get_buffer(frame);
     if (!buffer) {
-        qWarning() << "MppDecoder: 无法获取帧缓冲区";
         return false;
     }
     
     uint8_t* yPlane = (uint8_t*)mpp_buffer_get_ptr(buffer);
     if (!yPlane) {
-        qWarning() << "MppDecoder: 无法获取缓冲区指针";
         return false;
     }
     
     int yStride = mpp_frame_get_hor_stride(frame);
     int uvStride = yStride;
     uint8_t* uvPlane = yPlane + yStride * m_height;
-    
-    static int frameCount = 0;
-    frameCount++;
     
     // 整数运算 YUV 转 RGB
     for (int y = 0; y < m_height; y++) {
@@ -454,29 +335,16 @@ bool MppDecoder::convertNV12ToRGBbyCPU(MppFrame frame, QImage& image)
         }
     }
     
-    // 性能统计
-    if (frameCount % 30 == 0) {
-        static qint64 lastTime = 0;
-        qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-        if (lastTime > 0) {
-            double fps = 30000.0 / (currentTime - lastTime);
-            qDebug() << "MppDecoder: [CPU 软件] 转换帧率" << QString::number(fps, 'f', 2) << "fps";
-        }
-        lastTime = currentTime;
-    }
-    
     image = QImage(m_rgbBuffer, m_width, m_height, m_width * 3, QImage::Format_RGB888).copy();
     return true;
 }
 
 void MppDecoder::cleanup()
 {
-    qDebug() << "MppDecoder: 清理资源...";
-    
     if (m_rgbMppBuffer) {
         mpp_buffer_put(m_rgbMppBuffer);
         m_rgbMppBuffer = nullptr;
-        m_rgbBuffer = nullptr;  // 指针已失效
+        m_rgbBuffer = nullptr;
     } else if (m_rgbBuffer) {
         delete[] m_rgbBuffer;
         m_rgbBuffer = nullptr;

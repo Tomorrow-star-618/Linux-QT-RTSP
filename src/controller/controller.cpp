@@ -109,6 +109,41 @@ void Controller::onAddCameraClicked()
         addVideoStream(url, name, cameraId);
         
         m_view->addEventMessage("success", QString("正在添加摄像头 %1: %2").arg(cameraId).arg(name));
+        
+        // 自动绑定TCP客户端：检查是否有已连接的TCP客户端
+        if (tcpWin && tcpWin->hasConnectedClients()) {
+            QStringList connectedIps = tcpWin->getConnectedIps();
+            QMap<QString, int> ipCameraMap = tcpWin->getIpCameraMap();
+            
+            // 查找所有未绑定的IP地址
+            QStringList unboundIps;
+            for (const QString& ip : connectedIps) {
+                if (!ipCameraMap.contains(ip)) {
+                    unboundIps.append(ip);
+                }
+            }
+            
+            // 如果有未绑定的IP，自动绑定第一个
+            if (!unboundIps.isEmpty()) {
+                QString selectedIp = unboundIps.first();  // 自动选择第一个未绑定的IP
+                
+                // 执行绑定
+                tcpWin->bindIpToCamera(selectedIp, cameraId);
+                m_view->addEventMessage("success", QString("摄像头%1已自动绑定到IP地址%2").arg(cameraId).arg(selectedIp));
+                qDebug() << "自动绑定: 摄像头" << cameraId << "→ IP" << selectedIp;
+                
+                // 自动设置该摄像头为当前操作目标
+                tcpWin->setCurrentCameraId(cameraId);
+                qDebug() << "已自动设置摄像头" << cameraId << "为当前操作目标";
+                
+                // 设置VideoLabel显示绑定的IP地址
+                m_view->setCameraBoundIp(cameraId, selectedIp);
+                qDebug() << "已更新摄像头" << cameraId << "的悬停提示，显示IP:" << selectedIp;
+            } else {
+                qDebug() << "没有可用的未绑定TCP客户端IP";
+                m_view->addEventMessage("info", QString("摄像头%1已添加，但没有可用的TCP客户端进行绑定").arg(cameraId));
+            }
+        }
     } else {
         // 用户取消了添加操作
         m_view->addEventMessage("info", "取消添加摄像头");
