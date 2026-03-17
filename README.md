@@ -63,11 +63,11 @@
 
 <div align="center">
 
-**主界面布局展示**
-<img src="readme-picture/main-interface.png" alt="TCP服务界面" width="700"/>
+<p><b>主界面布局展示</b></p>
+<img src="readme-picture/main-interface.png" alt="TCP服务界面" width="600"/>
 
-**视频流拉取展示**
-<img src="readme-picture/two-video-streams.png" alt="TCP服务界面" width="700"/>
+<p><b>视频流拉取展示</b></p>
+<img src="readme-picture/two-video-streams.png" alt="TCP服务界面" width="600"/>
 
 </div>
 
@@ -81,8 +81,8 @@
 
 <div align="center">
 
-**TCP连接界面**
-<img src="readme-picture/tcp-communication.png" alt="TCP服务界面" width="700"/>
+<p><b>TCP连接界面</b></p>
+<img src="readme-picture/tcp-communication.png" alt="TCP服务界面" width="500"/>
 
 </div>
 
@@ -94,8 +94,8 @@
 
 <div align="center">
 
-**UDP广播界面**
-<img src="readme-picture/udp-communication.png" alt="udp服务界面" width="700"/>
+<p><b>UDP广播界面</b></p>
+<img src="readme-picture/udp-communication.png" alt="udp服务界面" width="500"/>
 
 </div>
 
@@ -106,8 +106,8 @@
 
 <div align="center">
 
-**全局识别界面**
-<img src="readme-picture/ai-recognition.png" alt="全屏AI识别效果" width="800"/>
+<p><b>全局识别界面</b></p>
+<img src="readme-picture/ai-recognition.png" alt="全屏AI识别效果" width="600"/>
 
 </div>
 
@@ -119,8 +119,8 @@
 
 <div align="center">
 
-**区域识别界面**
-<img src="readme-picture/region-detection.png" alt="区域识别效果" width="800"/>
+<p><b>区域识别界面</b></p>
+<img src="readme-picture/region-detection.png" alt="区域识别效果" width="600"/>
 
 </div>
 
@@ -132,11 +132,12 @@
 
 <div align="center">
 
-**物体识别展示**
-<img src="readme-picture/object-detection.png" alt="特定物体识别效果" width="800"/>
+<p><b>物体识别展示</b></p>
+<img src="readme-picture/object-detection.png" alt="特定物体识别效果" width="600"/>
 
-**物体选择界面**
-<img src="readme-picture/object-selection.png" alt="物体选择界面" width="500"/>
+<br>
+<p><b>物体选择界面</b></p>
+<img src="readme-picture/object-selection.png" alt="物体选择界面" width="600"/>
 
 </div>
 
@@ -149,8 +150,8 @@
 
 <div align="center">
 
-**相册界面**
-<img src="readme-picture/album-system.png" alt="相册功能界面" width="700"/>
+<p><b>相册界面</b></p>
+<img src="readme-picture/album-system.png" alt="相册功能界面" width="600"/>
 
 </div>
 
@@ -161,8 +162,7 @@
 
 <div align="center">
 
-**舵机操作布局展示**
-
+<p><b>舵机操作布局展示</b></p>
 <img src="readme-picture/servo.png" alt="方案预选界面" width="200"/>
 
 </div>
@@ -174,8 +174,8 @@
 
 <div align="center">
 
-**方案预选展示**
-<img src="readme-picture/scheme-preselection.png" alt="方案预选界面" width="700"/>
+<p><b>方案预选展示</b></p>
+<img src="readme-picture/scheme-preselection.png" alt="方案预选界面" width="600"/>
 
 </div>
 
