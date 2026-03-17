@@ -6,12 +6,21 @@
 #include <QDebug>
 #include <QApplication>
 #include <QIcon>
+#include <QScreen>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_tcpServer(nullptr)
 {
-    // 设置主窗口大小为1200x720
+#ifdef PLATFORM_RK3576
+    // 嵌入式平台：动态获取物理屏幕的真实分辨率并强制自适应铺满
+    QScreen *screen = QApplication::primaryScreen();
+    if (screen) {
+        this->setGeometry(screen->geometry());
+    }
+#else
+    // PC开发环境：保持适合调试的窗口大小
     this->resize(900, 550);
+#endif
     
     // 设置窗口图标
     this->setWindowIcon(QIcon(":icon/lmx.png"));

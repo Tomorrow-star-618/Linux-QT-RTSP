@@ -11,6 +11,13 @@ int main(int argc, char *argv[])
     
     QApplication a(argc, argv);
     MainWindow w;
+    
+#ifdef PLATFORM_RK3576
+    // 在 RK3576 嵌入式平台上全屏显示
+    w.showFullScreen();
+#else
     w.show();
+#endif
+
     return a.exec();
 }
