@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QCoreApplication>
 #include <QRegExp>
+#include <QUrl>
 #include "Picture.h"
 #include "Tcpserver.h" // Added for Tcpserver
 #include "plan.h"      // Added for Plan and PlanData
@@ -103,6 +104,59 @@ void Controller::onAddCameraClicked()
         addVideoStream(url, name, cameraId);
         
         m_view->addEventMessage("success", QString("正在添加摄像头 %1: %2").arg(cameraId).arg(name));
+        
+        // --- 从RTSP地址中提取IP，尝试主动绑定到对应TCP客户端 ---
+        QUrl parsedUrl(url);
+        QString extractedIp = parsedUrl.host();
+        if (extractedIp.isEmpty() && url.contains("://")) {
+            // QUrl 解析失败的备用方案：手动截取 IP
+            int start = url.indexOf("://") + 3;
+            int atPos = url.indexOf("@", start);
+            if (atPos != -1) start = atPos + 1; // 跳过账号密码
+            int endPort = url.indexOf(":", start);
+            int endSlash = url.indexOf("/", start);
+            int end = endPort;
+            if (end == -1 || (endSlash != -1 && endSlash < endPort)) end = endSlash;
+            if (end == -1) end = url.length();
+            extractedIp = url.mid(start, end - start);
+        }
+
+        if (tcpWin) {
+            bool hasBound = false;
+            
+            // 策略1：如果你填写的RTSP地址里提取到了明确的IP，直接与这台IP精准绑定
+            if (!extractedIp.isEmpty()) {
+                tcpWin->bindIpToCamera(extractedIp, cameraId);
+                m_view->setCameraBoundIp(cameraId, extractedIp);
+                tcpWin->setCurrentCameraId(cameraId);
+                qDebug() << "通过RTSP地址提取IP，精准绑定: 摄像头" << cameraId << "→ IP" << extractedIp;
+                m_view->addEventMessage("success", QString("摄像头%1已通过地址绑定TCP IP: %2").arg(cameraId).arg(extractedIp));
+                hasBound = true;
+            }
+            
+            // 策略2（备用选项）：如果你RTSP里没提出来合法IP（或者用本地等特殊地址），
+            // 若当前确实有未绑定的客户端连接着，默认给分一个
+            if (!hasBound && tcpWin->hasConnectedClients()) {
+                QStringList connectedIps = tcpWin->getConnectedIps();
+                QMap<QString, int> ipCameraMap = tcpWin->getIpCameraMap();
+                
+                QStringList unboundIps;
+                for (const QString& ip : connectedIps) {
+                    if (!ipCameraMap.contains(ip)) {
+                        unboundIps.append(ip);
+                    }
+                }
+                
+                if (!unboundIps.isEmpty()) {
+                    QString selectedIp = unboundIps.first();
+                    tcpWin->bindIpToCamera(selectedIp, cameraId);
+                    m_view->setCameraBoundIp(cameraId, selectedIp);
+                    tcpWin->setCurrentCameraId(cameraId);
+                    m_view->addEventMessage("success", QString("摄像头%1已随机绑定到未绑定IP: %2").arg(cameraId).arg(selectedIp));
+                }
+            }
+        }
+        // -----------------------------------------------------------
     } else {
         // 用户取消了添加操作
         m_view->addEventMessage("info", "取消添加摄像头");
@@ -914,7 +968,28 @@ void Controller::onTcpClientConnected(const QString& ip, quint16 port)
     QString msg = QString("TCP客户端已连接 IP:%1 端口:%2").arg(ip).arg(port);
     m_view->addEventMessage("info", msg);
     
-    // 不再立即提示绑定，等待用户添加摄像头时自动绑定
+    // 逆向自动绑定：检查是否有已添加但尚未绑定TCP客户端的摄像头
+    if (tcpWin) {
+        QMap<QString, int> ipCameraMap = tcpWin->getIpCameraMap();
+        // 确认该IP尚未绑定到任何摄像头
+        if (!ipCameraMap.contains(ip)) {
+            QList<int> usedCameraIds = m_view->getUsedCameraIds();
+            // 找出没有绑定IP的摄像头
+            for (int camId : usedCameraIds) {
+                QString existingIp = tcpWin->getIpForCamera(camId);
+                if (existingIp.isEmpty()) {
+                    // 该摄像头尚未绑定，将新连接的TCP客户端绑定到它
+                    tcpWin->bindIpToCamera(ip, camId);
+                    tcpWin->setCurrentCameraId(camId);
+                    m_view->setCameraBoundIp(camId, ip);
+                    m_view->addEventMessage("success", 
+                        QString("摄像头%1已自动绑定到IP地址%2").arg(camId).arg(ip));
+                    qDebug() << "TCP连接触发自动绑定: 摄像头" << camId << "→ IP" << ip;
+                    break; // 每个IP只绑定一个摄像头
+                }
+            }
+        }
+    }
 }
 
 void Controller::onPlanApplied(const PlanData& plan)
@@ -1293,40 +1368,60 @@ void Controller::onAddCameraWithIdRequested(int cameraId)
         
         m_view->addEventMessage("success", QString("正在添加摄像头 %1: %2").arg(cameraId).arg(name));
         
-        // 自动绑定TCP客户端：检查是否有已连接的TCP客户端
-        if (tcpWin && tcpWin->hasConnectedClients()) {
-            QStringList connectedIps = tcpWin->getConnectedIps();
-            QMap<QString, int> ipCameraMap = tcpWin->getIpCameraMap();
+        // --- 从RTSP地址中提取IP，尝试主动绑定到对应TCP客户端 ---
+        QUrl parsedUrl(url);
+        QString extractedIp = parsedUrl.host();
+        if (extractedIp.isEmpty() && url.contains("://")) {
+            // QUrl 解析失败的备用方案：手动截取 IP
+            int start = url.indexOf("://") + 3;
+            int atPos = url.indexOf("@", start);
+            if (atPos != -1) start = atPos + 1; // 跳过账号密码
+            int endPort = url.indexOf(":", start);
+            int endSlash = url.indexOf("/", start);
+            int end = endPort;
+            if (end == -1 || (endSlash != -1 && endSlash < endPort)) end = endSlash;
+            if (end == -1) end = url.length();
+            extractedIp = url.mid(start, end - start);
+        }
+
+        if (tcpWin) {
+            bool hasBound = false;
             
-            // 查找所有未绑定的IP地址
-            QStringList unboundIps;
-            for (const QString& ip : connectedIps) {
-                if (!ipCameraMap.contains(ip)) {
-                    unboundIps.append(ip);
+            // 策略1：如果你填写的RTSP地址里提取到了明确的IP，直接与这台IP精准绑定
+            if (!extractedIp.isEmpty()) {
+                tcpWin->bindIpToCamera(extractedIp, cameraId);
+                m_view->setCameraBoundIp(cameraId, extractedIp);
+                tcpWin->setCurrentCameraId(cameraId);
+                qDebug() << "通过RTSP地址提取IP，精准绑定: 摄像头" << cameraId << "→ IP" << extractedIp;
+                m_view->addEventMessage("success", QString("摄像头%1已通过地址绑定TCP IP: %2").arg(cameraId).arg(extractedIp));
+                hasBound = true;
+            }
+            
+            // 策略2（备用选项）：如果你RTSP里没提出来合法IP（或者用本地等特殊地址），
+            // 若当前确实有未绑定的客户端连接着，默认给分一个（兼容老逻辑）
+            if (!hasBound && tcpWin->hasConnectedClients()) {
+                QStringList connectedIps = tcpWin->getConnectedIps();
+                QMap<QString, int> ipCameraMap = tcpWin->getIpCameraMap();
+                
+                QStringList unboundIps;
+                for (const QString& ip : connectedIps) {
+                    if (!ipCameraMap.contains(ip)) {
+                        unboundIps.append(ip);
+                    }
+                }
+                
+                if (!unboundIps.isEmpty()) {
+                    QString selectedIp = unboundIps.first();
+                    tcpWin->bindIpToCamera(selectedIp, cameraId);
+                    m_view->setCameraBoundIp(cameraId, selectedIp);
+                    tcpWin->setCurrentCameraId(cameraId);
+                    m_view->addEventMessage("success", QString("摄像头%1已自动绑定到未绑定IP: %2").arg(cameraId).arg(selectedIp));
+                } else {
+                    m_view->addEventMessage("info", QString("摄像头%1已添加，但没有可用的TCP客户端进行绑定").arg(cameraId));
                 }
             }
-            
-            // 如果有未绑定的IP，自动绑定第一个
-            if (!unboundIps.isEmpty()) {
-                QString selectedIp = unboundIps.first();  // 自动选择第一个未绑定的IP
-                
-                // 执行绑定
-                tcpWin->bindIpToCamera(selectedIp, cameraId);
-                m_view->addEventMessage("success", QString("摄像头%1已自动绑定到IP地址%2").arg(cameraId).arg(selectedIp));
-                qDebug() << "自动绑定: 摄像头" << cameraId << "→ IP" << selectedIp;
-                
-                // 自动设置该摄像头为当前操作目标
-                tcpWin->setCurrentCameraId(cameraId);
-                qDebug() << "已自动设置摄像头" << cameraId << "为当前操作目标";
-                
-                // 设置VideoLabel显示绑定的IP地址
-                m_view->setCameraBoundIp(cameraId, selectedIp);
-                qDebug() << "已更新摄像头" << cameraId << "的悬停提示，显示IP:" << selectedIp;
-            } else {
-                qDebug() << "没有可用的未绑定TCP客户端IP";
-                m_view->addEventMessage("info", QString("摄像头%1已添加，但没有可用的TCP客户端进行绑定").arg(cameraId));
-            }
         }
+        // -----------------------------------------------------------
     } else {
         // 用户取消了添加操作
         m_view->addEventMessage("info", "取消添加摄像头");

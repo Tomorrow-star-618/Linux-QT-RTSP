@@ -123,10 +123,27 @@ QString Tcpserver::getLocalIPAddress()
                      ipStr.section('.', 1, 1).toInt() >= 16 && 
                      ipStr.section('.', 1, 1).toInt() <= 31)) {
                     
-                    // 如果还没有选定IP，或者当前IP是以太网接口（优先于WiFi）
-                    if (preferredIp.isEmpty() || 
-                        interface.humanReadableName().contains("Ethernet", Qt::CaseInsensitive) ||
-                        interface.humanReadableName().contains("以太网", Qt::CaseInsensitive)) {
+                    QString ifaceName = interface.humanReadableName();
+                    
+                    // 跳过WSL、虚拟网卡、Docker等虚拟接口
+                    if (ifaceName.contains("WSL", Qt::CaseInsensitive) ||
+                        ifaceName.contains("Virtual", Qt::CaseInsensitive) ||
+                        ifaceName.contains("vEthernet", Qt::CaseInsensitive) ||
+                        ifaceName.contains("VMware", Qt::CaseInsensitive) ||
+                        ifaceName.contains("VirtualBox", Qt::CaseInsensitive) ||
+                        ifaceName.contains("docker", Qt::CaseInsensitive)) {
+                        if (fallbackIp.isEmpty()) {
+                            fallbackIp = ipStr; // 降级为备选
+                        }
+                        continue;
+                    }
+                    
+                    // 192.168.x.x 最高优先级（最常见的家庭/办公局域网）
+                    if (ipStr.startsWith("192.168.")) {
+                        preferredIp = ipStr; // 直接设为最优，不再被覆盖
+                    }
+                    // 其他局域网地址（10.x.x.x / 172.16-31.x.x），仅在还没有preferred时设置
+                    else if (preferredIp.isEmpty()) {
                         preferredIp = ipStr;
                     }
                 } else if (fallbackIp.isEmpty()) {

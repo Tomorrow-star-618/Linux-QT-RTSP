@@ -240,20 +240,24 @@ void DeviceDiscovery::handleDiscoveryResponse(const QJsonObject &jsonData,
     return;
   }
 
-  bool isNewDevice = !m_devices.contains(deviceId);
-
-  DiscoveredDevice &device = m_devices[deviceId];
-  device.deviceId = deviceId;
-  device.deviceName =
-      jsonData.value("device_name")
-          .toString(QString("未知设备_%1").arg(deviceId.left(8)));
-
   // 处理IP地址：优先使用UDP包的来源IP，并确保是IPv4格式
   QString senderIp = sender.toString();
   if (senderIp.startsWith("::ffff:")) {
     senderIp = senderIp.mid(7);
   }
-  device.ipAddress = senderIp; // 忽略JSON里的IP，直接用物理来源IP，更加可靠
+
+  // 使用IP地址作为唯一标识，防止多个设备固件中 device_id 相同导致互相覆盖
+  QString uniqueId = senderIp;
+
+  bool isNewDevice = !m_devices.contains(uniqueId);
+
+  DiscoveredDevice &device = m_devices[uniqueId];
+  device.deviceId = uniqueId;
+  device.deviceName =
+      jsonData.value("device_name")
+          .toString(QString("未知设备_%1").arg(deviceId.left(8)));
+
+  device.ipAddress = senderIp;
 
   device.rtspPort = jsonData.value("rtsp_port").toInt(554);
 
@@ -291,13 +295,14 @@ void DeviceDiscovery::handleDiscoveryResponse(const QJsonObject &jsonData,
 
 void DeviceDiscovery::handleHeartbeat(const QJsonObject &jsonData,
                                       const QHostAddress &sender) {
-  QString deviceId = jsonData.value("device_id").toString();
-  if (deviceId.isEmpty()) {
-    return;
+  QString senderIp = sender.toString();
+  if (senderIp.startsWith("::ffff:")) {
+    senderIp = senderIp.mid(7);
   }
+  QString uniqueId = senderIp; // 同理，使用IP作为唯一标识符
 
-  if (m_devices.contains(deviceId)) {
-    DiscoveredDevice &device = m_devices[deviceId];
+  if (m_devices.contains(uniqueId)) {
+    DiscoveredDevice &device = m_devices[uniqueId];
     bool wasOffline = !device.isOnline;
     device.lastSeen = QDateTime::currentDateTime();
     device.isOnline = true;
