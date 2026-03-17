@@ -64,8 +64,10 @@ SOURCES += \
     $$VIEW_DIR/plan.cpp \
     $$VIEW_DIR/view.cpp \
     $$VIEW_DIR/AddCameraDialog.cpp \
+    $$VIEW_DIR/DeviceDiscoveryDialog.cpp \
     $$CONTROLLER_DIR/controller.cpp \
-    $$CONTROLLER_DIR/Tcpserver.cpp
+    $$CONTROLLER_DIR/Tcpserver.cpp \
+    $$CONTROLLER_DIR/DeviceDiscovery.cpp
 
 # RK3576 平台特定源文件
 contains(DEFINES, PLATFORM_RK3576) {
@@ -87,8 +89,10 @@ HEADERS += \
     $$VIEW_DIR/plan.h \
     $$VIEW_DIR/view.h \
     $$VIEW_DIR/AddCameraDialog.h \
+    $$VIEW_DIR/DeviceDiscoveryDialog.h \
     $$CONTROLLER_DIR/controller.h \
-    $$CONTROLLER_DIR/Tcpserver.h
+    $$CONTROLLER_DIR/Tcpserver.h \
+    $$CONTROLLER_DIR/DeviceDiscovery.h
 
 # RK3576 平台特定头文件
 contains(DEFINES, PLATFORM_RK3576) {

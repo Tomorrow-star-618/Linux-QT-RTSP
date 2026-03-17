@@ -1,4 +1,4 @@
-# 🚀 瑞芯微RV1106智能识别终端
+# 🚀 基于RK3576的视频监控客户端
 
 <div align="center">
 
@@ -13,44 +13,103 @@
 
 ## 📋 项目概述
 
-项目由PC端Qt服务器与本地RV1106客户端组成，采用分布式架构设计。本代码是PC端Qt服务器实现，基于经典的MVC架构模式，提供完整的智能视觉监控解决方案。
+### 🎯 项目架构
+
+本项目采用**分布式PC-客户端架构**，分为两大部分：
+
+| 部分 | 描述 | 仓库链接 |
+|------|------|--------|
+| **📸 RV1106终端** | 基于瑞芯微RV1106的网络摄像头终端软件 | [Intelligent_Recognition_Client](https://github.com/Tomorrow-star-618/Intelligent_Recognition_Client) |
+| **🖥️ RK3576客户端** | 基于RK3576的视频监控PC客户端 ⭐ **本仓库** | [Linux-QT-RTSP](https://github.com/Tomorrow-star-618/Linux-QT-RTSP) |
+
+### 🌿 分支说明
+
+本仓库包含两个主要分支，满足不同平台需求：
+
+#### `master` 分支 ✅ **推荐用于开发**
+- **支持平台**: Windows 10/11、Ubuntu 20.04/22.04
+- **特性**: 完整的监控功能，适合通用PC开发和部署
+- **用途**: 标准桌面应用开发
+
+#### `rk3576` 分支 🔧 **嵌入式优化专用**
+- **目标设备**: 野火鲁班猫3（RK3576开发板）
+- **优化项目**:
+  - 🎬 多路硬件视频加速 (VPU、RGA 2D加速)
+  - 🖼️ Mali-G52 GPU加速渲染
+- **兼容性**: 仍支持 Windows 与 Ubuntu 系统
+- **关系**: 在 `master` 分支基础上进行二次开发优化
 
 ---
 
-## 🖥️ 主界面展示
+## 📑 文档导航
 
-![主界面展示](readme-picture/main-interface.png)
+- [✨ 核心功能](#-核心功能)
+- [🛠️ 开发环境](#️-开发环境)
+- [📚 使用教程](#-使用教程)
+- [🏗️ 框架设计](#️-框架设计)
+- [📁 项目结构](#-项目结构)
+- [🚀 应用场景](#-应用场景)
+- [📄 许可证](#-许可证)
 
----
 
 ## ✨ 核心功能
+
+### 📺 视频流
+- **智能双解码**: 分平台自动切换，PC端使用FFmpeg软解，RK3576平台进行硬解
+- **MPP硬件解码**: 集成瑞芯微MPP硬件解码，极限降低CPU占用率
+- **RGA硬件加速**: 利用RGA 2D引擎和ION零拷贝，实现高效图像格式转换
+- **多线程与容错**: 独立线程防UI阻塞，内置断流异常检测与超时自动重连
+- **视频流控制**: 实时输出QImage，支持启动/停止/暂停/恢复等操作
+
+<div align="center">
+
+<p><b>主界面布局展示</b></p>
+<img src="readme-picture/main-interface.png" alt="TCP服务界面" width="600"/>
+
+<p><b>视频流拉取展示</b></p>
+<img src="readme-picture/two-video-streams.png" alt="TCP服务界面" width="600"/>
+
+</div>
+
 ### 🌐 TCP服务端
 - **多客户端支持**: 可同时处理多个客户端连接
 - **收发数据**: 可以指定发送任意数据到当前连接上的任意客户端上
 - **IP地址管理**: 自动获取本地所有IPv4地址
 - **连接状态监控**: 实时监控socket连接状态变化
 - **AI数据解析**: 自动解析DETECTIONS格式的检测结果
+- **自动绑定机制**: 新TCP客户端连接时自动与未绑定的摄像头关联
 
-### 📺 视频流
-- **RTSP流解码**: 利用FFmpeg工具支持RTSP视频流的实时解码和播放
-- **多线程处理**: 使用独立线程处理视频流，避免阻塞UI界面
-- **实时帧输出**: 将解码后的视频帧转换为QImage格式供UI显示
-- **视频流控制**: 支持启动/停止/暂停/恢复操作
+<div align="center">
 
-### 📸 相册
-- **双相册系统**: 截图相册 + 报警相册独立管理
-- **图片缩放**: 支持用户鼠标滚轮缩放（0.2x-3.0x倍数）
-- **精准定位**: 支持水平滑动条快速定位与数字跳转
+<p><b>TCP连接界面</b></p>
+<img src="readme-picture/tcp-communication.png" alt="TCP服务界面" width="500"/>
 
-### 🎮 舵机云台
-- **四向控制**: 上下左右自由转动 + 复位功能
-- **步进设置**: 滑动条与下拉框设置舵机步进值
-- **TCP指令**: 通过网络发送舵机控制指令
+</div>
+
+### 📡 UDP设备自动发现
+- **局域网扫描**: 基于UDP广播协议，自动扫描局域网内的在线摄像头设备
+- **状态监控**: 实时监控设备心跳，并在UI中直观更新设备的在线/离线状态
+- **一键连接**: 双击或选中设备后点击连接，一键下发TCP连接请求建立通信
+- **信息解析**: 自动解析并展示设备的名称、IP、RTSP地址和设备型号等信息
+
+<div align="center">
+
+<p><b>UDP广播界面</b></p>
+<img src="readme-picture/udp-communication.png" alt="udp服务界面" width="500"/>
+
+</div>
 
 ### 🤖 AI识别
 - **YOLOv5支持**: 标准COCO数据集80类对象识别
 - **实时检测**: 视频流中的目标检测
 - **结果显示**: 检测框和置信度显示
+
+<div align="center">
+
+<p><b>全局识别界面</b></p>
+<img src="readme-picture/ai-recognition.png" alt="全屏AI识别效果" width="600"/>
+
+</div>
 
 ### 🎯 区域识别
 - **区域识别**: 支持指定方框内的区域识别，过滤方框外的信息
@@ -58,16 +117,67 @@
 - **实时预览**: 绘制过程中实时显示矩形框轮廓和尺寸
 - **尺寸显示**: 显示矩形框的宽度和高度信息
 
+<div align="center">
+
+<p><b>区域识别界面</b></p>
+<img src="readme-picture/region-detection.png" alt="区域识别效果" width="600"/>
+
+</div>
+
 ### 🔍 物体识别
 - **物体识别**: 支持识别指定coco数据集内的类别，可单选或者多选
 - **智能搜索**: 实时搜索高亮匹配对象
 - **批量操作**: 全选/清空/搜索功能
 - **选择统计**: 实时显示已选择数量
 
+<div align="center">
+
+<p><b>物体识别展示</b></p>
+<img src="readme-picture/object-detection.png" alt="特定物体识别效果" width="600"/>
+
+<br>
+<p><b>物体选择界面</b></p>
+<img src="readme-picture/object-selection.png" alt="物体选择界面" width="600"/>
+
+</div>
+
+### 📸 相册
+- **双相册系统**: 截图相册与报警相册独立管理，支持无缝切换查看
+- **时间排序**: 支持按图片生成时间进行快速的升序或降序排列
+- **设备筛选**: 提供下拉框快速过滤并归类由指定摄像头产生的图片
+- **交互体验**: 支持鼠标滚轮动态缩放（0.2x-3.0x）与上下翻页查看
+- **文件操作**: 支持通过滑动条和输入框精确定位跳转，以及从本地直接删除图片
+
+<div align="center">
+
+<p><b>相册界面</b></p>
+<img src="readme-picture/album-system.png" alt="相册功能界面" width="600"/>
+
+</div>
+
+### 🎮 舵机云台
+- **四向控制**: 上下左右自由转动 + 复位功能
+- **步进设置**: 滑动条与下拉框设置舵机步进值
+- **TCP指令**: 通过网络发送舵机控制指令
+
+<div align="center">
+
+<p><b>舵机操作布局展示</b></p>
+<img src="readme-picture/servo.png" alt="方案预选界面" width="200"/>
+
+</div>
+
 ### 📋 方案预选
 - **SQLite数据库**: 本地化存储方案配置
 - **一键配置**: 预设完整的监控方案，一键应用所有配置
 - **方案管理**: 可创建、保存、编辑、删除多个监控方案
+
+<div align="center">
+
+<p><b>方案预选展示</b></p>
+<img src="readme-picture/scheme-preselection.png" alt="方案预选界面" width="600"/>
+
+</div>
 
 ---
 
@@ -153,45 +263,7 @@ INCLUDEPATH += /usr/include/x86_64-linux-gnu
 INCLUDEPATH += /usr/include
 ```
 
-### 🌐 网络配置
-
-#### 5️⃣ 查询虚拟机IP地址
-
-使用`ifconfig`命令查询当前虚拟机的IP地址：
-
-```bash
-ifconfig
-```
-
-**示例输出**:
-```
-ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 192.168.1.156  netmask 255.255.255.0  broadcast 192.168.1.255
-        ...
-```
-
-> ⚠️ **注意**: 确保虚拟机IP与RV1106设备IP在同一局域网下，推荐将虚拟机配置为**桥接模式**。
-
-#### 6️⃣ 修改TCP服务器监听地址
-
-打开`Tcpserver.cpp`文件，找到IP地址初始化代码：
-
-```cpp
-// 修改前
-Ip_lineEdit = new QLineEdit("192.168.1.156");
-
-// 修改为步骤5查询到的虚拟机IP地址
-Ip_lineEdit = new QLineEdit("你的虚拟机IP地址");
-```
-
-**例如**:
-```cpp
-Ip_lineEdit = new QLineEdit("192.168.1.100");  // 替换为实际IP
-```
-
-### 🚀 运行与使用
-
-#### 7️⃣ 启动应用程序
+#### 5️⃣  启动应用程序
 
 1. **编译项目**: 在Qt Creator中打开项目并编译
 2. **运行程序**: 点击运行按钮启动应用
@@ -207,34 +279,16 @@ Ip_lineEdit = new QLineEdit("192.168.1.100");  // 替换为实际IP
 2. 选择预设的监控方案
 3. 点击"应用方案"一键配置
 
+##### 方式三：UDP广播自动发现（推荐）
+1. 确保PC服务器网络正常并启动程序
+2. PC自动开始广播UDP发现消息
+3. 客户端设备启动后自动收到广播
+4. 客户端自动连接到PC并建立TCP连接
+5. PC自动绑定已添加的摄像头到客户端IP
+6. 摄像头绑定成功，即可通信
+
 > 🔗 **RTSP地址格式**: `rtsp://192.168.1.100/live/0`  
 > 其中`192.168.1.100`为RV1106设备的实际IP地址
-
-### ✅ 验证安装
-
-#### 检查项目清单
-
-- [ ] Qt 5.12.9 安装完成
-- [ ] FFmpeg库文件安装成功
-- [ ] 库文件路径配置正确
-- [ ] 虚拟机与RV1106在同一网络
-- [ ] TCP服务器IP地址配置正确
-- [ ] 项目编译无错误
-- [ ] 视频流连接成功
-
-### 🔧 常见问题
-
-#### 编译错误
-- **问题**: 找不到FFmpeg头文件
-- **解决**: 检查INCLUDEPATH配置是否正确
-
-#### 网络连接失败
-- **问题**: 无法连接到RV1106设备
-- **解决**: 检查IP地址和网络连通性
-
-#### 视频流无法播放
-- **问题**: RTSP流连接失败
-- **解决**: 确认RV1106设备RTSP服务正常运行
 
 ---
 ## 🏗️ 框架设计
@@ -270,6 +324,11 @@ Ip_lineEdit = new QLineEdit("192.168.1.100");  // 替换为实际IP
   - COCO数据集对象列表界面
   - 搜索和批量操作界面
 
+- **DeviceDiscoveryDialog.cpp/h**: 设备发现对话框
+  - UDP设备扫描界面
+  - 设备列表展示
+  - 一键连接功能
+
 #### 🎮 Controller层 (控制逻辑层)
 - **controller.cpp/h**: 主控制器
   - 业务逻辑协调和控制
@@ -281,100 +340,58 @@ Ip_lineEdit = new QLineEdit("192.168.1.100");  // 替换为实际IP
   - 客户端连接管理
   - 数据协议解析和处理
 
-### ⚙️ 核心技术架构
-
-#### 🧵 多线程架构
-```
-主UI线程
-├── 视频解码线程 (Model)
-├── TCP服务器线程 (TcpServerThread)
-└── 数据库操作线程 (Plan)
-```
-
-#### 📡 信号槽通信机制
-- **Model → Controller**: 视频帧数据传递
-- **TcpServer → Controller**: 网络数据和连接状态
-- **Plan → Controller**: 方案配置数据
-- **Controller → View**: 界面更新和状态同步
-
-#### 🌊 数据流架构
-```
-RTSP视频流 → FFmpeg解码 → QImage转换 → 界面显示
-TCP数据 → 协议解析 → 业务处理 → 设备控制
-用户操作 → 控制器处理 → 数据模型 → 界面反馈
-```
+- **DeviceDiscovery.cpp/h**: 设备发现管理器
+  - UDP广播发现机制
+  - 自动IP-摄像头绑定
+  - 设备列表维护
 
 ---
 
 ## 📁 项目结构
 ```
 rtsp/
-├── � src/                      # 源代码目录（MVC架构）
+├── 📂 src/                      # 源代码目录（MVC架构）
 │   ├── main.cpp                 # 程序入口
 │   │
 │   ├── 📂 model/                # Model层 - 数据模型
 │   │   ├── model.cpp/h          # 视频流数据处理模型
+│   │   ├── FFmpegDecoder.cpp/h  # FFmpeg 软件解码实现
+│   │   ├── MppDecoder.cpp/h     # MPP 硬件解码实现
+│   │   ├── IVideoDecoder.h      # 解码器接口（抽象类）
 │   │   └── common.h             # 公共头文件和宏定义
 │   │
-│   ├── � view/                 # View层 - 视图界面
+│   ├── 📂 view/                 # View层 - 视图界面
 │   │   ├── mainwindow.cpp/h/ui  # 主窗口界面
 │   │   ├── Picture.cpp/h        # 相册浏览组件
 │   │   ├── VideoLabel.cpp/h     # 自定义视频显示控件
 │   │   ├── detectlist.cpp/h     # 对象选择列表组件
+│   │   ├── AddCameraDialog.cpp/h # 添加摄像头对话框
+│   │   ├── DeviceDiscoveryDialog.cpp/h # 设备发现对话框
 │   │   ├── plan.cpp/h           # 方案预选管理界面
 │   │   └── view.cpp/h           # 视图基类
 │   │
 │   └── 📂 controller/           # Controller层 - 控制器
 │       ├── controller.cpp/h     # MVC主控制器
-│       └── Tcpserver.cpp/h      # TCP服务器控制器
+│       ├── Tcpserver.cpp/h      # TCP服务器控制器
+│       └── DeviceDiscovery.cpp/h # 设备发现管理器(UDP广播、自动绑定)
 │
-├── 📂 build/                    # 编译输出目录（自动生成）
-│   ├── obj/                     # 目标文件
-│   ├── moc/                     # MOC生成文件
-│   ├── rcc/                     # 资源编译文件
-│   └── ui/                      # UI文件生成
+├── 📂 build/                    # 编译输出目录
 │
 ├── 🎨 资源文件
-│   ├── icon.qrc              # 图标资源文件
-│   ├── icon/                 # 图标文件目录
-│   │   ├── addvideo.png      # 添加视频图标
-│   │   ├── AI.png            # AI功能图标
-│   │   ├── album.png         # 相册图标
-│   │   ├── screenshot.png    # 截图图标
-│   │   └── ...               # 其他界面图标
-│   └── picture/              # 图片存储目录
-│       ├── save-picture/     # 截图相册目录
-│       └── alarm-picture/    # 报警相册目录
+│   ├── icon.qrc                 # 图标资源文件
+│   ├── 📂 icon/                 # UI界面图标目录
+│   └── 📂 picture/              # 本地数据存储目录
+│       ├── save-picture/        # 截图相册存储
+│       └── alarm-picture/       # 报警相册存储
 │
 ├── ⚙️ 配置文件
-│   ├── rtsp.pro              # Qt项目配置文件
-│   ├── rtsp.pro.user         # Qt Creator用户配置
-│   └── .gitignore            # Git忽略配置
+│   ├── rtsp.pro                 # Qt项目配置文件
+│   └── .gitignore               # Git忽略配置
 │
 └── 📖 文档
-    ├── README.md             # 项目说明文档
-    └── readme-picture/       # 项目效果展示图片
-        ├── main-interface.png        # 主界面展示图
-        ├── ai-recognition.png        # AI智能识别效果图
-        ├── region-detection.png      # 区域限定识别效果图
-        ├── object-selection.png      # 物体选择界面图
-        ├── object-detection.png      # 特定物体识别效果图
-        ├── region-object-detection.png # 区域+物体组合识别图
-        ├── scheme-preselection.png   # 智能方案预选界面图
-        ├── album-system.png          # 相册管理系统界面图
-        └── tcp-communication.png     # TCP网络通信界面图
-```
-
-### 🔗 依赖关系图
-```
-controller (核心控制器)
-├── model (视频流模型)
-├── Tcpserver (网络通信)
-├── plan (方案管理)
-├── mainwindow (主界面)
-├── Picture (相册组件)
-├── VideoLabel (视频控件)
-└── detectlist (对象选择)
+    ├── README.md                # 项目主说明文档
+    ├── MODEL_DATAFLOW.md        # 硬件加速与数据流解析文档
+    └── 📂 readme-picture/       # README展示配图目录
 ```
 
 ### 🎯 关键设计模式
@@ -406,81 +423,6 @@ controller (核心控制器)
 
 ---
 
-## 🎬 效果展示
-
-### 🤖 AI智能识别功能
-
-#### 🔍 全屏AI识别
-> 📋 **功能说明**: 默认全屏识别模式，检测画面中的所有目标对象
-
-<div align="center">
-<img src="readme-picture/ai-recognition.png" alt="全屏AI识别效果" width="800"/>
-</div>
-
----
-
-#### 📐 区域限定识别
-> 🎯 **功能说明**: 只识别用户指定矩形框内的物体，过滤框外干扰信息
-
-<div align="center">
-<img src="readme-picture/region-detection.png" alt="区域识别效果" width="800"/>
-</div>
-
----
-
-#### 🔖 特定物体识别
-> 🎛️ **功能说明**: 从COCO数据集80类中选择特定物体进行识别，支持单选和多选
-
-<div align="center">
-
-**物体选择界面**
-<img src="readme-picture/object-selection.png" alt="物体选择界面" width="600"/>
-
-**识别效果展示**
-<img src="readme-picture/object-detection.png" alt="特定物体识别效果" width="800"/>
-
-</div>
-
----
-
-#### 🎯 区域+物体组合识别
-> 🔬 **功能说明**: 精确识别 - 仅在指定区域内检测指定类型的物体
-
-<div align="center">
-<img src="readme-picture/region-object-detection.png" alt="组合识别效果" width="800"/>
-</div>
-
----
-
-### 🛠️ 系统管理功能
-
-#### 📋 智能方案预选
-> ⚡ **功能说明**: 一键导入预设配置，快速部署不同监控场景
-
-<div align="center">
-<img src="readme-picture/scheme-preselection.png" alt="方案预选界面" width="700"/>
-</div>
-
----
-
-#### 📸 相册管理系统
-> 📂 **功能说明**: 分类管理截图和报警图片，支持缩放、排序、删除等操作
-
-<div align="center">
-<img src="readme-picture/album-system.png" alt="相册功能界面" width="700"/>
-</div>
-
----
-
-#### 🌐 TCP网络通信
-> 📡 **功能说明**: 多客户端连接管理，实时数据传输和设备控制
-
-<div align="center">
-<img src="readme-picture/tcp-communication.png" alt="TCP服务界面" width="700"/>
-</div>
-
----
-
 ### ✨ 功能特色总结
 
 | 🎯 功能模块 | 🔧 核心特性 | 📊 应用场景 |
@@ -491,6 +433,9 @@ controller (核心控制器)
 | **📋 方案预选** | 一键配置切换 | 多场景快速部署 |
 | **📸 相册管理** | 双相册系统 | 图片分类存储 |
 | **🌐 TCP通信** | 多客户端支持 | 设备集中控制 |
+| **📡 UDP广播** | 自动发现+自动绑定 | 零配置部署 |
+| **⚡ RK3576硬件加速** | MPP硬解/RGA转码/硬件渲染 | 边缘端部署 |
+| **🛠️ 跨平台编译** | 兼容Win/Linux与x86/ARM架构 | 可移植性高 |
 
 > 💡 **提示**: 点击图片可查看更清晰的效果展示
 
