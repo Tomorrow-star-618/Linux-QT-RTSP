@@ -1,6 +1,7 @@
 #ifdef PLATFORM_RK3576
 
 #include "MppDecoder.h"
+#include "model.h"
 #include <cstring>
 #include <QDateTime>
 
@@ -77,12 +78,32 @@ bool MppDecoder::init(AVCodecParameters* codecpar)
     m_width = codecpar->width;
     m_height = codecpar->height;
     
-    // 利用硬件 RGA 提前进行缩放（如果是1080P等高分辨率，多路显示时UI根本不需要原尺寸）
-    // 通过将画面尺寸硬件缩小，能让 QImage 的内存拷贝和主线程渲染的 CPU 负担大幅降低！
-    m_outWidth = m_width > 1280 ? m_width / 2 : m_width;
-    m_outHeight = m_height > 720 ? m_height / 2 : m_height;
+    // 利用硬件 RGA 提前进行缩放
+    // 获取当前的UI网格数，以决定合理的缩放比例
+    int gridCount = Model::s_currentGridCount.loadAcquire();
+    if (gridCount >= 16) {
+        // 16路时，如果是1080P，缩小到 1/4 -> 480x270，极大减小带宽和数据量
+        m_outWidth = m_width / 4;
+        m_outHeight = m_height / 4;
+    } else if (gridCount >= 9) {
+        // 9路时，缩小到 1/3 -> 640x360
+        m_outWidth = m_width / 3;
+        m_outHeight = m_height / 3;
+    } else if (gridCount >= 4) {
+        // 4路时，缩小到 1/2 -> 960x540
+        m_outWidth = m_width / 2;
+        m_outHeight = m_height / 2;
+    } else {
+        // 单路时，保持原尺寸或适当缩放以适应屏幕(比如默认1080p屏，如果片源4K则缩放1/2)
+        m_outWidth = m_width > 1920 ? m_width / 2 : m_width;
+        m_outHeight = m_height > 1080 ? m_height / 2 : m_height;
+    }
     
-    // 分配 RGB 缓冲池
+    // 保证至少16字节对齐，因为很多硬件编解码器有这个要求
+    m_outWidth = (m_outWidth + 15) & ~15;
+    m_outHeight = (m_outHeight + 15) & ~15;
+    
+    // 分配 RGB 缓冲池(按照原始尺寸申请，以防切换布局时数组不够)
     m_rgbBufferSize = m_width * m_height * 3;
     
     for (int i = 0; i < POOL_SIZE; ++i) {
@@ -156,8 +177,23 @@ bool MppDecoder::receiveFrame(QImage& image)
         m_width = mpp_frame_get_width(mppFrame);
         m_height = mpp_frame_get_height(mppFrame);
         
-        m_outWidth = m_width > 1280 ? m_width / 2 : m_width;
-        m_outHeight = m_height > 720 ? m_height / 2 : m_height;
+        int gridCount = Model::s_currentGridCount.loadAcquire();
+        if (gridCount >= 16) {
+            m_outWidth = m_width / 4;
+            m_outHeight = m_height / 4;
+        } else if (gridCount >= 9) {
+            m_outWidth = m_width / 3;
+            m_outHeight = m_height / 3;
+        } else if (gridCount >= 4) {
+            m_outWidth = m_width / 2;
+            m_outHeight = m_height / 2;
+        } else {
+            m_outWidth = m_width > 1920 ? m_width / 2 : m_width;
+            m_outHeight = m_height > 1080 ? m_height / 2 : m_height;
+        }
+
+        m_outWidth = (m_outWidth + 15) & ~15;
+        m_outHeight = (m_outHeight + 15) & ~15;
         
         // 重新分配 RGB 缓冲池
         m_rgbBufferSize = m_width * m_height * 3;
@@ -262,6 +298,34 @@ bool MppDecoder::convertNV12ToRGBbyRGA(MppFrame frame, QImage& image)
     // RGA wstride 是像素宽度，需要 16 字节对齐
     int dstWStride = (m_outWidth + 15) & ~15;
     
+    // 动态检查如果此时布局发生了变化，可以在这里立刻更新输出分辨率
+    // 这样不用等到 info_change 也可以实时响应 1路/4路/9路 切换！
+    int currentGrid = Model::s_currentGridCount.loadAcquire();
+    int newOutWidth = m_width;
+    int newOutHeight = m_height;
+    if (currentGrid >= 16) {
+        newOutWidth = m_width / 4;
+        newOutHeight = m_height / 4;
+    } else if (currentGrid >= 9) {
+        newOutWidth = m_width / 3;
+        newOutHeight = m_height / 3;
+    } else if (currentGrid >= 4) {
+        newOutWidth = m_width / 2;
+        newOutHeight = m_height / 2;
+    } else {
+        newOutWidth = m_width > 1920 ? m_width / 2 : m_width;
+        newOutHeight = m_height > 1080 ? m_height / 2 : m_height;
+    }
+    newOutWidth = (newOutWidth + 15) & ~15;
+    newOutHeight = (newOutHeight + 15) & ~15;
+    
+    // 如果跟之前计算的不一致，立刻更新（由于缓冲池一开始使用了最大尺寸申请，所以缩小画面是完全安全的）
+    if (newOutWidth != m_outWidth || newOutHeight != m_outHeight) {
+        m_outWidth = newOutWidth;
+        m_outHeight = newOutHeight;
+        dstWStride = (m_outWidth + 15) & ~15;
+    }
+
     // 轮转缓冲池索引
     m_poolIndex = (m_poolIndex + 1) % POOL_SIZE;
     uint8_t* currentVirAddr = m_rgbBuffers[m_poolIndex];

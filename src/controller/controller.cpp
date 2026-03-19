@@ -159,6 +159,8 @@ void Controller::onAddCameraClicked()
                     m_view->setCameraBoundIp(cameraId, selectedIp);
                     tcpWin->setCurrentCameraId(cameraId);
                     m_view->addEventMessage("success", QString("摄像头%1已随机绑定到未绑定IP: %2").arg(cameraId).arg(selectedIp));
+                } else {
+                    m_view->addEventMessage("info", QString("摄像头%1已添加，但没有可用的TCP客户端进行绑定").arg(cameraId));
                 }
             }
         }
@@ -1246,6 +1248,10 @@ void Controller::clearAllStreams()
 void Controller::onLayoutModeChanged(int mode)
 {
     qDebug() << "布局模式切换为:" << mode << "路";
+    
+    // 更新Model的静态参考格数，供底层MppDecoder动态决定硬件缩放倍率
+    Model::s_currentGridCount.storeRelease(mode);
+    
     m_view->switchToLayoutMode(mode);
     m_view->addEventMessage("info", QString("切换到 %1 路显示模式").arg(mode));
 }

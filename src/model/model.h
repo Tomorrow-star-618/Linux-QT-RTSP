@@ -21,13 +21,15 @@ public:
     explicit Model(QObject* parent = nullptr); // 构造函数，初始化Model对象
     ~Model();                                  // 析构函数，释放资源
     void startStream(const QString& url);      // 启动视频流线程，传入RTSP地址
-    
-    QAtomicInt pendingFrames; // 用于检测积压的帧数
-
     void stopStream();                         // 停止视频流线程
     void pauseStream();                        // 暂停视频流
     void resumeStream();                       // 恢复视频流
     bool isPaused() const { return m_pause; }  // 获取暂停状态
+    
+    // 全局静态变量，记录当前的网格数 (1, 4, 9, 16)
+    static QAtomicInt s_currentGridCount;
+
+    QAtomicInt pendingFrames; // 用于检测积压的帧数
 
 signals:
     void frameReady(const QImage& img);        // 视频帧准备好时发出信号，传递QImage

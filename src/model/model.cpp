@@ -12,6 +12,8 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 
+QAtomicInt Model::s_currentGridCount(1); // 默认最初是单画面
+
 Model::Model(QObject* parent)
     : QThread(parent), m_stop(false), pendingFrames(0)
 {
