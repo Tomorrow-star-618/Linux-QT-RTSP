@@ -4,6 +4,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
+#include <QAtomicInt>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -23,6 +24,7 @@ public:
     void pauseStream();                        // 暂停视频流
     void resumeStream();                       // 恢复视频流
     bool isPaused() const { return m_pause; }  // 获取暂停状态
+    QAtomicInt pendingFrames; // 用于检测积压的帧数
 
 signals:
     void frameReady(const QImage& img);        // 视频帧准备好时发出信号，传递QImage

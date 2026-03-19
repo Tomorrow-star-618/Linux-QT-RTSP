@@ -7,7 +7,7 @@ extern "C" {
 }
 
 Model::Model(QObject* parent)
-    : QThread(parent), m_stop(false)
+    : QThread(parent), m_stop(false), pendingFrames(0)
 {
 }
 
@@ -163,7 +163,12 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, AVCodecContext* codec_
                     // 构造QImage并发送信号
                     QImage img(rgbFrame->data[0], codec_ctx->width, codec_ctx->height,
                                rgbFrame->linesize[0], QImage::Format_RGB888);
-                    emit frameReady(img.copy());
+
+                    // 控制事件队列中的QImage积压，如果渲染不及时直接丢帧，防止内存泄漏和卡顿
+                    if (pendingFrames.loadAcquire() < 3) {
+                        pendingFrames.fetchAndAddRelease(1);
+                        emit frameReady(img);
+                    }
                 }
             }
         }
