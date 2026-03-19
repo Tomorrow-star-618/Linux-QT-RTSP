@@ -4,6 +4,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
+#include <QAtomicInt>
 #include "IVideoDecoder.h"
 
 extern "C" {
@@ -20,6 +21,9 @@ public:
     explicit Model(QObject* parent = nullptr); // 构造函数，初始化Model对象
     ~Model();                                  // 析构函数，释放资源
     void startStream(const QString& url);      // 启动视频流线程，传入RTSP地址
+    
+    QAtomicInt pendingFrames; // 用于检测积压的帧数
+
     void stopStream();                         // 停止视频流线程
     void pauseStream();                        // 暂停视频流
     void resumeStream();                       // 恢复视频流
@@ -52,4 +56,4 @@ private:
     bool m_pause = false;      // 暂停标志
     QMutex m_mutex;            // 互斥锁，保证多线程安全
     QWaitCondition m_wait;     // 条件变量，用于线程等待和唤醒
-}; 
+};

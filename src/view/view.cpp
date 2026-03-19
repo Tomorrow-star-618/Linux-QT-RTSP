@@ -1068,9 +1068,10 @@ void View::updateVideoFrame(int streamId, const QImage& frame)
     VideoLabel* label = videoLabels.value(streamId, nullptr);
     if (label && label->isVisible()) {
         QPixmap pixmap = QPixmap::fromImage(frame);
+        // 使用FastTransformation降低UI线程的CPU消耗，防止事件队列积压引发内存泄漏
         label->setPixmap(pixmap.scaled(label->size(), 
                                        Qt::KeepAspectRatio, 
-                                       Qt::SmoothTransformation));
+                                       Qt::FastTransformation));
     }
 }
 

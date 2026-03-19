@@ -47,13 +47,20 @@ private:
     
     int m_width;
     int m_height;
-    bool m_initialized;
-    bool m_useRGA;             // 是否使用 RGA 硬件加速
     
-    // 用于格式转换的临时缓冲区
-    uint8_t* m_rgbBuffer;
-    size_t m_rgbBufferSize;
-    MppBuffer m_rgbMppBuffer;  // RGA 输出缓冲区
+    // 增加硬件缩放目标尺寸
+    int m_outWidth;
+    int m_outHeight;
+
+    bool m_initialized;
+    bool m_useRGA;
+    
+    // 引入对象池，防止在使用零拷贝 `QImage` 时产生内存读写撕裂现象
+    static const int POOL_SIZE = 4;
+    uint8_t* m_rgbBuffers[POOL_SIZE];
+    MppBuffer m_rgbMppBuffers[POOL_SIZE];
+    int m_poolIndex;
+    int m_rgbBufferSize;
 };
 
 #endif // PLATFORM_RK3576

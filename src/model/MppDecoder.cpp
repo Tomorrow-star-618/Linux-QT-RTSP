@@ -10,12 +10,19 @@ MppDecoder::MppDecoder()
     , m_frmGrp(nullptr)
     , m_width(0)
     , m_height(0)
+    , m_outWidth(0)
+    , m_outHeight(0)
     , m_initialized(false)
     , m_useRGA(true)  // 默认启用 RGA
-    , m_rgbBuffer(nullptr)
+    , m_poolIndex(0)
     , m_rgbBufferSize(0)
-    , m_rgbMppBuffer(nullptr)
 {
+    // 初始化缓冲池数组
+    for (int i = 0; i < POOL_SIZE; ++i) {
+        m_rgbBuffers[i] = nullptr;
+        m_rgbMppBuffers[i] = nullptr;
+    }
+
     // 初始化 RGA
     int rgaRet = c_RkRgaInit();
     if (rgaRet != 0) {
@@ -70,42 +77,26 @@ bool MppDecoder::init(AVCodecParameters* codecpar)
     m_width = codecpar->width;
     m_height = codecpar->height;
     
-    // 创建帧缓冲组
-    ret = mpp_buffer_group_get_internal(&m_frmGrp, MPP_BUFFER_TYPE_ION);
-    if (ret != MPP_OK) {
-        qWarning() << "MppDecoder: 创建帧缓冲组失败" << ret;
-        cleanup();
-        return false;
-    }
+    // 利用硬件 RGA 提前进行缩放（如果是1080P等高分辨率，多路显示时UI根本不需要原尺寸）
+    // 通过将画面尺寸硬件缩小，能让 QImage 的内存拷贝和主线程渲染的 CPU 负担大幅降低！
+    m_outWidth = m_width > 1280 ? m_width / 2 : m_width;
+    m_outHeight = m_height > 720 ? m_height / 2 : m_height;
     
-    // 设置帧缓冲组
-    ret = m_mppApi->control(m_mppCtx, MPP_DEC_SET_EXT_BUF_GROUP, m_frmGrp);
-    if (ret != MPP_OK) {
-        qWarning() << "MppDecoder: 设置帧缓冲组失败" << ret;
-        cleanup();
-        return false;
-    }
-    
-    // 分配 RGB 缓冲区
+    // 分配 RGB 缓冲池
     m_rgbBufferSize = m_width * m_height * 3;
     
-    if (m_useRGA) {
-        // 使用 MPP buffer 以便 RGA 可以直接访问
-        MPP_RET ret = mpp_buffer_get(m_frmGrp, &m_rgbMppBuffer, m_rgbBufferSize);
-        if (ret == MPP_OK) {
-            m_rgbBuffer = (uint8_t*)mpp_buffer_get_ptr(m_rgbMppBuffer);
+    for (int i = 0; i < POOL_SIZE; ++i) {
+        if (m_useRGA) {
+            MPP_RET ret = mpp_buffer_get(m_frmGrp, &m_rgbMppBuffers[i], m_rgbBufferSize);
+            if (ret == MPP_OK) {
+                m_rgbBuffers[i] = (uint8_t*)mpp_buffer_get_ptr(m_rgbMppBuffers[i]);
+            } else {
+                m_rgbBuffers[i] = new uint8_t[m_rgbBufferSize];
+                m_useRGA = false;
+            }
         } else {
-            m_rgbBuffer = new uint8_t[m_rgbBufferSize];
-            m_useRGA = false;
+            m_rgbBuffers[i] = new uint8_t[m_rgbBufferSize];
         }
-    } else {
-        m_rgbBuffer = new uint8_t[m_rgbBufferSize];
-    }
-    
-    if (!m_rgbBuffer) {
-        qWarning() << "MppDecoder: 分配 RGB 缓冲区失败";
-        cleanup();
-        return false;
     }
     
     m_initialized = true;
@@ -165,30 +156,37 @@ bool MppDecoder::receiveFrame(QImage& image)
         m_width = mpp_frame_get_width(mppFrame);
         m_height = mpp_frame_get_height(mppFrame);
         
-        // 重新分配 RGB 缓冲区
+        m_outWidth = m_width > 1280 ? m_width / 2 : m_width;
+        m_outHeight = m_height > 720 ? m_height / 2 : m_height;
+        
+        // 重新分配 RGB 缓冲池
         m_rgbBufferSize = m_width * m_height * 3;
         
-        // 正确释放旧缓冲区
-        if (m_rgbMppBuffer) {
-            mpp_buffer_put(m_rgbMppBuffer);
-            m_rgbMppBuffer = nullptr;
-            m_rgbBuffer = nullptr;
-        } else if (m_rgbBuffer) {
-            delete[] m_rgbBuffer;
-            m_rgbBuffer = nullptr;
+        // 正确释放旧缓冲池
+        for (int i = 0; i < POOL_SIZE; ++i) {
+            if (m_rgbMppBuffers[i]) {
+                mpp_buffer_put(m_rgbMppBuffers[i]);
+                m_rgbMppBuffers[i] = nullptr;
+                m_rgbBuffers[i] = nullptr;
+            } else if (m_rgbBuffers[i]) {
+                delete[] m_rgbBuffers[i];
+                m_rgbBuffers[i] = nullptr;
+            }
         }
         
-        // 重新分配新缓冲区
-        if (m_useRGA) {
-            MPP_RET ret = mpp_buffer_get(m_frmGrp, &m_rgbMppBuffer, m_rgbBufferSize);
-            if (ret == MPP_OK) {
-                m_rgbBuffer = (uint8_t*)mpp_buffer_get_ptr(m_rgbMppBuffer);
+        // 重新分配新缓冲池
+        for (int i = 0; i < POOL_SIZE; ++i) {
+            if (m_useRGA) {
+                MPP_RET ret = mpp_buffer_get(m_frmGrp, &m_rgbMppBuffers[i], m_rgbBufferSize);
+                if (ret == MPP_OK) {
+                    m_rgbBuffers[i] = (uint8_t*)mpp_buffer_get_ptr(m_rgbMppBuffers[i]);
+                } else {
+                    m_rgbBuffers[i] = new uint8_t[m_rgbBufferSize];
+                    m_useRGA = false;
+                }
             } else {
-                m_rgbBuffer = new uint8_t[m_rgbBufferSize];
-                m_useRGA = false;
+                m_rgbBuffers[i] = new uint8_t[m_rgbBufferSize];
             }
-        } else {
-            m_rgbBuffer = new uint8_t[m_rgbBufferSize];
         }
         
         mpp_frame_deinit(&mppFrame);
@@ -262,23 +260,28 @@ bool MppDecoder::convertNV12ToRGBbyRGA(MppFrame frame, QImage& image)
     memset(&dst, 0, sizeof(rga_info_t));
     
     // RGA wstride 是像素宽度，需要 16 字节对齐
-    int dstWStride = (m_width + 15) & ~15;
+    int dstWStride = (m_outWidth + 15) & ~15;
     
-    if (m_rgbMppBuffer) {
-        int dstFd = mpp_buffer_get_fd(m_rgbMppBuffer);
+    // 轮转缓冲池索引
+    m_poolIndex = (m_poolIndex + 1) % POOL_SIZE;
+    uint8_t* currentVirAddr = m_rgbBuffers[m_poolIndex];
+    MppBuffer currentMppBuf = m_rgbMppBuffers[m_poolIndex];
+
+    if (currentMppBuf) {
+        int dstFd = mpp_buffer_get_fd(currentMppBuf);
         if (dstFd < 0) {
             return false;
         }
         dst.fd = dstFd;
         dst.mmuFlag = 1;
     } else {
-        dst.virAddr = m_rgbBuffer;
+        dst.virAddr = currentVirAddr;
         dst.mmuFlag = 1;
     }
     
-    rga_set_rect(&dst.rect, 0, 0, m_width, m_height, dstWStride, m_height, RK_FORMAT_RGB_888);
+    rga_set_rect(&dst.rect, 0, 0, m_outWidth, m_outHeight, dstWStride, m_outHeight, RK_FORMAT_RGB_888);
     
-    // 执行 RGA 转换
+    // 执行 RGA 转换 (这一步底层将同时完成 NV12 -> RGB 转换 和 尺寸缩放)
     int ret = c_RkRgaBlit(&src, &dst, nullptr);
     if (ret != 0) {
         return false;
@@ -286,7 +289,9 @@ bool MppDecoder::convertNV12ToRGBbyRGA(MppFrame frame, QImage& image)
     
     // 创建 QImage - RGB888 每像素3字节
     int bytesPerLine = dstWStride * 3;
-    image = QImage(m_rgbBuffer, m_width, m_height, bytesPerLine, QImage::Format_RGB888).copy();
+    // 关键改变：直接包装内存而不是深拷贝 (去掉 .copy() ！！！)
+    // 对象池保证了这部分内存至少在接下来的 4 帧期间不会被覆盖，能够完全覆盖 UI 的消费时间。
+    image = QImage(currentVirAddr, m_outWidth, m_outHeight, bytesPerLine, QImage::Format_RGB888);
     
     return true;
 }
@@ -308,11 +313,15 @@ bool MppDecoder::convertNV12ToRGBbyCPU(MppFrame frame, QImage& image)
     int uvStride = yStride;
     uint8_t* uvPlane = yPlane + yStride * m_height;
     
+    // 轮转缓冲池索引
+    m_poolIndex = (m_poolIndex + 1) % POOL_SIZE;
+    uint8_t* currentVirAddr = m_rgbBuffers[m_poolIndex];
+
     // 整数运算 YUV 转 RGB
     for (int y = 0; y < m_height; y++) {
         uint8_t* yRow = yPlane + y * yStride;
         uint8_t* uvRow = uvPlane + (y / 2) * uvStride;
-        uint8_t* rgbRow = m_rgbBuffer + y * m_width * 3;
+        uint8_t* rgbRow = currentVirAddr + y * m_width * 3;
         
         for (int x = 0; x < m_width; x++) {
             int Y = yRow[x];
@@ -335,19 +344,22 @@ bool MppDecoder::convertNV12ToRGBbyCPU(MppFrame frame, QImage& image)
         }
     }
     
-    image = QImage(m_rgbBuffer, m_width, m_height, m_width * 3, QImage::Format_RGB888).copy();
+    image = QImage(currentVirAddr, m_width, m_height, m_width * 3, QImage::Format_RGB888);
     return true;
 }
 
 void MppDecoder::cleanup()
 {
-    if (m_rgbMppBuffer) {
-        mpp_buffer_put(m_rgbMppBuffer);
-        m_rgbMppBuffer = nullptr;
-        m_rgbBuffer = nullptr;
-    } else if (m_rgbBuffer) {
-        delete[] m_rgbBuffer;
-        m_rgbBuffer = nullptr;
+    // 释放整个缓冲池
+    for (int i = 0; i < POOL_SIZE; ++i) {
+        if (m_rgbMppBuffers[i]) {
+            mpp_buffer_put(m_rgbMppBuffers[i]);
+            m_rgbMppBuffers[i] = nullptr;
+            m_rgbBuffers[i] = nullptr;
+        } else if (m_rgbBuffers[i]) {
+            delete[] m_rgbBuffers[i];
+            m_rgbBuffers[i] = nullptr;
+        }
     }
     
     if (m_frmGrp) {

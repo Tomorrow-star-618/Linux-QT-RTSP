@@ -13,7 +13,7 @@ extern "C" {
 }
 
 Model::Model(QObject* parent)
-    : QThread(parent), m_stop(false)
+    : QThread(parent), m_stop(false), pendingFrames(0)
 {
 }
 
@@ -96,6 +96,10 @@ IVideoDecoder* Model::createDecoder()
     qDebug() << "Model: 使用 FFmpeg 软件解码器";
     return new FFmpegDecoder();
 #endif
+
+    // qDebug() << "Model: 使用 FFmpeg 软件解码器";
+    // return new FFmpegDecoder();
+
 }
 
 // 打开解码器
@@ -154,7 +158,11 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, IVideoDecoder* decoder
                 // 接收解码帧
                 QImage img;
                 while (decoder->receiveFrame(img)) {
-                    emit frameReady(img);
+                    // 控制事件队列中的QImage积压，如果渲染不及时直接丢帧，防止内存泄漏和卡顿
+                    if (pendingFrames.loadAcquire() < 3) {
+                        pendingFrames.fetchAndAddRelease(1);
+                        emit frameReady(img);
+                    }
                     frameCount++;
                     
                     // 每100帧统计一次帧率
@@ -162,7 +170,7 @@ void Model::readAndDecodeFrames(AVFormatContext* fmt_ctx, IVideoDecoder* decoder
                         qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
                         qint64 elapsed = currentTime - startTime;
                         double fps = (frameCount * 1000.0) / elapsed;
-                        qDebug() << "解码帧率:" << QString::number(fps, 'f', 2) << "fps，已解码" << frameCount << "帧";
+                        // qDebug() << "解码帧率:" << QString::number(fps, 'f', 2) << "fps，已解码" << frameCount << "帧";
                     }
                 }
             }
@@ -247,4 +255,4 @@ void Model::run()
         // 发出重连信号
         emit streamReconnecting(currentUrl);
     }
-} 
+}

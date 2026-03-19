@@ -1281,6 +1281,16 @@ void Controller::onStreamSelected(int streamId)
 
 void Controller::onModelFrameReady(int streamId, const QImage& frame)
 {
+
+        // 如果存在此模型，则释放其挂起的帧计数，防止内存泄漏和卡顿
+    if (m_streamModels.contains(streamId)) {
+        Model* pModel = m_streamModels.value(streamId);
+        if (pModel) {
+            pModel->pendingFrames.fetchAndAddRelease(-1);
+        }
+    }
+
+
     // 更新指定流的视频帧
     if (!frame.isNull()) {
         m_view->updateVideoFrame(streamId, frame);
