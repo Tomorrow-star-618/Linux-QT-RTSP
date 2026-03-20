@@ -320,6 +320,10 @@ INCLUDEPATH += /usr/include
 
 <div align="center">
 
+<p><b>16路测试实物展示图</b></p>
+<img src="readme-picture/16-channel-video.jpg" alt="8路硬解性能图" width="600"/>
+
+<br>
 <p><b>8路硬解性能图 (CPU占用仅36%)</b></p>
 <img src="readme-picture/8-hard-decoding.png" alt="8路硬解性能图" width="600"/>
 
