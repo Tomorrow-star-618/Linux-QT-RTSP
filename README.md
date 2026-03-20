@@ -46,6 +46,7 @@
 - [✨ 核心功能](#-核心功能)
 - [🛠️ 开发环境](#️-开发环境)
 - [📚 使用教程](#-使用教程)
+- [📈 性能测试](#-性能测试)
 - [🏗️ 框架设计](#️-框架设计)
 - [📁 项目结构](#-项目结构)
 - [🚀 应用场景](#-应用场景)
@@ -63,8 +64,10 @@
 
 <div align="center">
 
-<p><b>主界面布局展示</b></p>
-<img src="readme-picture/main-interface.png" alt="TCP服务界面" width="600"/>
+<p><b>实物展示</b></p>
+<img src="readme-picture/physical-object.jpg" alt="TCP服务界面" width="600"/>
+
+
 
 <p><b>视频流拉取展示</b></p>
 <img src="readme-picture/two-video-streams.png" alt="TCP服务界面" width="600"/>
@@ -289,6 +292,44 @@ INCLUDEPATH += /usr/include
 
 > 🔗 **RTSP地址格式**: `rtsp://192.168.1.100/live/0`  
 > 其中`192.168.1.100`为RV1106设备的实际IP地址
+
+---
+
+## 📈 性能测试
+
+本项目在 **RK3576** 平台上进行了多路连续视频流（分辨率：`1920x1080`）的软硬件解码性能对比测试，充分验证了硬件加速对系统底层计算资源的解放能力。
+
+### 💻 FFmpeg 软解模式（仅依赖 CPU）
+- **8路视频流软解**：系统 CPU 占用率达 **80%**，程序仍能正常运行，但系统产生较大负荷。
+- **10路视频流软解**：系统出现明显卡顿，CPU 占用率达到 **100% 极限满载**，不再满足流畅监控的需求。
+
+<div align="center">
+
+<p><b>8路软解性能图 (CPU占用约80%)</b></p>
+<img src="readme-picture/8-soft-decoding.png" alt="8路软解性能图" width="600"/>
+
+<br>
+<p><b>10路软解性能图 (CPU满载卡顿)</b></p>
+<img src="readme-picture/10-soft-decoding.png" alt="10路软解性能图" width="600"/>
+
+</div>
+
+### ⚡ MPP+RGA 硬解模式（芯片硬件加速）
+- **8路视频流硬解**：系统 CPU 占用率急剧下降，仅维持在 **36%** 左右，画面极为流畅丝滑。
+- **16路视频流硬解**：在挑战极限的 **16 路全画幅高并发**压力下，CPU 占用率仅微升至 **45%**，系统依然轻松胜任、毫无卡顿，完美展现了当前架构在嵌入式平台上的性能统治力。
+
+<div align="center">
+
+<p><b>8路硬解性能图 (CPU占用仅36%)</b></p>
+<img src="readme-picture/8-hard-decoding.png" alt="8路硬解性能图" width="600"/>
+
+<br>
+<p><b>16路硬解性能图 (满载16路流畅运行)</b></p>
+<img src="readme-picture/16-hard-decoding.png" alt="16路硬解性能图" width="600"/>
+
+</div>
+
+
 
 ---
 ## 🏗️ 框架设计
